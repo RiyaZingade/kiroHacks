@@ -1,0 +1,64 @@
+{
+  "name": "p4-dev",
+  "description": "P4 agent for Current Flow Animation & Run Panel development",
+  "prompt": "You are building P4 of CirKit: the Current Flow Animation, Code Editor, Run Instructions, and Run Panel. Follow the specs in .kiro/specs/p4-run-panel/ and the steering rules in .kiro/steering/. Use Konva.Tween for animation, plain <pre> for code display, and the existing OpenAI SDK for /generate-code. Never add new npm dependencies. Always read schema.json before writing prompts that reference circuit JSON.",
+  "tools": [
+    "fs_read",
+    "fs_write",
+    "execute_bash",
+    "grep",
+    "glob",
+    "code"
+  ],
+  "allowedTools": [
+    "fs_read",
+    "grep",
+    "glob",
+    "code"
+  ],
+  "toolsSettings": {
+    "fs_write": {
+      "allowedPaths": [
+        "frontend/src/components/RunPanel.jsx",
+        "frontend/src/components/CodeEditor.jsx",
+        "frontend/src/components/CurrentFlowAnimation.jsx",
+        "frontend/src/components/RunInstructions.jsx",
+        "frontend/src/components/MainLayout.jsx",
+        "backend/main.py"
+      ]
+    }
+  },
+  "resources": [
+    "file://schema.json",
+    "file://features.md",
+    "file://.kiro/specs/p4-run-panel/requirements.md",
+    "file://.kiro/specs/p4-run-panel/design.md",
+    "file://.kiro/specs/p4-run-panel/tasks.md",
+    "file://frontend/src/components/RunPanel.jsx",
+    "file://frontend/src/components/MainLayout.jsx",
+    "file://backend/main.py"
+  ],
+  "hooks": {
+    "agentSpawn": [
+      {
+        "command": "cat .kiro/specs/p4-run-panel/tasks.md | grep -c '\\- \\[ \\]'",
+        "timeout_ms": 5000
+      }
+    ],
+    "preToolUse": [
+      {
+        "matcher": "fs_write",
+        "command": "echo 'Reminder: P4 owns RunPanel, CodeEditor, CurrentFlowAnimation, RunInstructions, and /generate-code only. Do not modify other routes or P1-P3 components.'",
+        "timeout_ms": 5000
+      }
+    ],
+    "stop": [
+      {
+        "command": "cd frontend && npx --yes vite build --mode development 2>&1 | tail -5 || echo 'Build check: see errors above'",
+        "timeout_ms": 30000
+      }
+    ]
+  },
+  "keyboardShortcut": "ctrl+shift+4",
+  "welcomeMessage": "P4 agent ready. Working on: CurrentFlowAnimation, CodeEditor, RunInstructions, RunPanel, and /generate-code."
+}
