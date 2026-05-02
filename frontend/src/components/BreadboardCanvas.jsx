@@ -1,4 +1,5 @@
 import { Stage, Layer, Rect, Circle, Line, Text } from 'react-konva'
+import CurrentFlowAnimation from './CurrentFlowAnimation'
 
 // P3 owns this file
 // Renders circuit JSON onto a Konva canvas
@@ -6,19 +7,19 @@ import { Stage, Layer, Rect, Circle, Line, Text } from 'react-konva'
 
 const CELL = 20 // grid cell size in px
 
-export default function BreadboardCanvas({ circuit, setCircuit }) {
+export default function BreadboardCanvas({ circuit, setCircuit, playing }) {
   const components = circuit?.components ?? []
   const connections = circuit?.connections ?? []
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-hidden">
       <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-800">
         <span className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Canvas</span>
         {/* TODO P3: add Agent/Manual mode toggle here */}
       </div>
       <Stage width={800} height={600} className="bg-gray-900">
         <Layer>
-          {/* Breadboard grid dots */}
+          {/* Breadboard grid dots — hidden for testing
           {Array.from({ length: 30 }, (_, row) =>
             Array.from({ length: 40 }, (_, col) => (
               <Circle
@@ -30,6 +31,7 @@ export default function BreadboardCanvas({ circuit, setCircuit }) {
               />
             ))
           )}
+          */}
 
           {/* Components — placeholder rects until ComponentRenderer is wired */}
           {components.map((c) => (
@@ -57,6 +59,7 @@ export default function BreadboardCanvas({ circuit, setCircuit }) {
             />
           ))}
         </Layer>
+        <CurrentFlowAnimation components={components} connections={connections} playing={playing} />
       </Stage>
     </div>
   )
