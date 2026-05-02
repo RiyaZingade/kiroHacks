@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import MainLayout from './components/MainLayout'
-import MOCK_CIRCUIT from '../../../schema.json'
+
+const MOCK_CIRCUIT = { components: [], connections: [] };
 
 export default function App() {
   const [circuit, setCircuit] = useState(MOCK_CIRCUIT)
