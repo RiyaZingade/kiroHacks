@@ -23,8 +23,8 @@ npm run dev
 ### 3. Backend
 ```bash
 cd backend
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
+python3.12 -m venv .venv        # must be Python 3.12 — PyMuPDF has no 3.13/3.14 wheels yet
+source .venv/bin/activate       # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
 cp .env.example .env            # then paste your OpenAI key into .env

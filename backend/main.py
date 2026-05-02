@@ -9,6 +9,8 @@ load_dotenv()
 
 ai = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
+MODEL = "claude-sonnet-4-20250514"
+
 app = FastAPI(title="CirKit API")
 
 app.add_middleware(

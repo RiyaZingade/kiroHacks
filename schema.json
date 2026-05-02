@@ -1,4 +1,30 @@
 {
-  "components": [],
-  "connections": []
+  "components": [
+    { "id": "R1", "type": "resistor", "value": "10kΩ", "position": [3, 5] },
+    { "id": "LED1", "type": "led", "color": "red", "position": [5, 5] },
+    { "id": "BTN1", "type": "button", "position": [7, 5] }
+  ],
+  "connections": [
+    { "from": "VCC", "to": "R1.pin1" },
+    { "from": "R1.pin2", "to": "LED1.anode" },
+    { "from": "LED1.cathode", "to": "BTN1.pin1" },
+    { "from": "BTN1.pin2", "to": "GND" }
+  ],
+  "power": { "voltage": 5, "source": "VCC" },
+  "code": {
+    "language": "arduino",
+    "source": "",
+    "origin": "agent"
+  },
+  "run_instructions": {
+    "power_requirements": "",
+    "wiring_steps": [],
+    "software_setup": "",
+    "safety_flags": []
+  },
+  "canvas_mode": "agent",
+  "metadata": {
+    "name": "Untitled Circuit",
+    "entry_point": "B"
+  }
 }
