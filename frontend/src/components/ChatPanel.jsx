@@ -1,56 +1,105 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 // P1 owns this file
-// POST /api/chat → { reply, updated_circuit }
 export default function ChatPanel({ circuit, setCircuit }) {
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Hi! Describe a circuit or ask me to modify the current one.' }
+    { role: 'assistant', content: 'Hi! Describe a circuit and I\'ll build it, or ask me to modify the current one.' }
   ])
+  const [history, setHistory] = useState([])  // Claude-format history (no system messages)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [contextWarning, setContextWarning] = useState(false)
+  const bottomRef = useRef(null)
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
   async function send() {
-    if (!input.trim()) return
-    const userMsg = { role: 'user', content: input }
-    setMessages((m) => [...m, userMsg])
+    if (!input.trim() || loading) return
+    const userText = input.trim()
     setInput('')
+    setMessages((m) => [...m, { role: 'user', content: userText }])
     setLoading(true)
+
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: input, circuit_id: circuit?.metadata?.id })
+        body: JSON.stringify({
+          message: userText,
+          circuit: circuit,
+          history: history,
+        }),
       })
       const data = await res.json()
+
+      // Update chat display
       setMessages((m) => [...m, { role: 'assistant', content: data.reply }])
+
+      // Update conversation history for next turn
+      setHistory((h) => [
+        ...h,
+        { role: 'user', content: userText },
+        { role: 'assistant', content: data.reply },
+      ])
+
+      // Update canvas if circuit changed
       if (data.updated_circuit) setCircuit(data.updated_circuit)
+
+      setContextWarning(data.context_warning)
     } catch {
-      setMessages((m) => [...m, { role: 'assistant', content: 'Error reaching backend.' }])
+      setMessages((m) => [...m, { role: 'assistant', content: '⚠ Could not reach the backend.' }])
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="flex flex-col h-full p-4 gap-3">
-      <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Chat</h2>
-      <div className="flex-1 overflow-y-auto flex flex-col gap-2">
+    <div className="flex flex-col h-full">
+      <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+        <span className="text-sm font-semibold text-gray-300">CirKit Agent</span>
+        {contextWarning && (
+          <span className="text-xs bg-yellow-900 text-yellow-300 px-2 py-1 rounded">
+            Context getting long — accuracy may drop
+          </span>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
         {messages.map((m, i) => (
-          <div key={i} className={`text-sm px-3 py-2 rounded-lg max-w-[85%] ${m.role === 'user' ? 'self-end bg-blue-600' : 'self-start bg-gray-800'}`}>
-            {m.content}
+          <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`text-sm px-3 py-2 rounded-lg max-w-[85%] whitespace-pre-wrap ${
+              m.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-100'
+            }`}>
+              {m.content}
+            </div>
           </div>
         ))}
-        {loading && <div className="text-xs text-gray-500 self-start">Thinking…</div>}
+        {loading && (
+          <div className="flex justify-start">
+            <div className="bg-gray-800 text-gray-400 text-sm px-3 py-2 rounded-lg">Thinking…</div>
+          </div>
+        )}
+        <div ref={bottomRef} />
       </div>
-      <div className="flex gap-2">
+
+      <div className="px-4 py-3 border-t border-gray-800 flex gap-2">
         <input
-          className="flex-1 bg-gray-800 rounded px-3 py-2 text-sm outline-none"
+          className="flex-1 bg-gray-800 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-blue-500"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && send()}
+          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && send()}
           placeholder="Describe or modify a circuit…"
+          disabled={loading}
         />
-        <button onClick={send} className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded text-sm">Send</button>
+        <button
+          onClick={send}
+          disabled={loading || !input.trim()}
+          className="bg-blue-600 hover:bg-blue-500 disabled:opacity-40 px-4 py-2 rounded-lg text-sm font-medium"
+        >
+          Send
+        </button>
       </div>
     </div>
   )
