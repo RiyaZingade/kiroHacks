@@ -10,6 +10,7 @@ import os
 load_dotenv()
 
 ai = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
 MODEL = "claude-sonnet-4-20250514"
 
 SYSTEM_PROMPT = """You are CirKit, an AI circuit design assistant.
@@ -85,6 +86,7 @@ class ChatRequest(BaseModel):
 
 @app.post("/chat")
 async def chat(req: ChatRequest):
+
     # Build message history, injecting current circuit into the first user turn
     messages = list(req.history)
 
@@ -108,6 +110,7 @@ async def chat(req: ChatRequest):
             break
 
     context_warning = response.usage.input_tokens > 150_000
+
 
     return {
         "reply": reply,
@@ -158,10 +161,12 @@ class CodeRequest(BaseModel):
 async def generate_code(req: CodeRequest):
     # TODO P4: pass full circuit JSON in prompt
     response = ai.messages.create(
-        model=MODEL,
+        model="claude-opus-4-5",
         max_tokens=2048,
         system=f"Generate {req.language} code for the given circuit. Return only code, no explanation.",
-        messages=[{"role": "user", "content": f"circuit_id: {req.circuit_id}"}],
+        messages=[
+            {"role": "user", "content": f"circuit_id: {req.circuit_id}"},
+        ],
     )
     return {
         "code": response.content[0].text,
