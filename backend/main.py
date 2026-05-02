@@ -154,19 +154,26 @@ async def validate_circuit(req: ValidateRequest):
 # ---------------------------------------------------------------------------
 
 class CodeRequest(BaseModel):
-    circuit_id: str | None = None
+    circuit: dict
     language: str = "arduino"
 
 @app.post("/generate-code")
 async def generate_code(req: CodeRequest):
-    # TODO P4: pass full circuit JSON in prompt
+    components = req.circuit.get("components", [])
+    connections = req.circuit.get("connections", [])
+    if not components and not connections:
+        raise HTTPException(status_code=400, detail="Circuit has no components or connections")
+
+    circuit_str = json.dumps(req.circuit, indent=2)
+
     response = ai.messages.create(
-        model="claude-opus-4-5",
+        model=MODEL,
         max_tokens=2048,
-        system=f"Generate {req.language} code for the given circuit. Return only code, no explanation.",
-        messages=[
-            {"role": "user", "content": f"circuit_id: {req.circuit_id}"},
-        ],
+        system=(
+            f"You are an electronics code generator. Given a circuit JSON, produce {req.language} code "
+            "that would run on real hardware. Return ONLY the code — no markdown fences, no explanation."
+        ),
+        messages=[{"role": "user", "content": f"Generate {req.language} code for this circuit:\n\n{circuit_str}"}],
     )
     return {
         "code": response.content[0].text,
