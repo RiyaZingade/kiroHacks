@@ -2,12 +2,13 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from openai import OpenAI
+import anthropic
 import os
 
 load_dotenv()
 
-ai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+ai = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+MODEL = "claude-sonnet-4-20250514"
 
 app = FastAPI(title="CirKit API")
 
@@ -39,14 +40,13 @@ class ChatRequest(BaseModel):
 @app.post("/chat")
 async def chat(req: ChatRequest):
     # TODO P1: pull conversation history, inject circuit state, parse JSON from response
-    response = ai.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "You are a circuit design assistant. Return valid circuit JSON."},
-            {"role": "user", "content": req.message},
-        ],
+    response = ai.messages.create(
+        model=MODEL,
+        max_tokens=1024,
+        system="You are a circuit design assistant. Return valid circuit JSON.",
+        messages=[{"role": "user", "content": req.message}],
     )
-    reply = response.choices[0].message.content
+    reply = response.content[0].text
     return {
         "reply": reply,
         "updated_circuit": None,  # TODO P1: parse circuit JSON from reply
@@ -94,14 +94,13 @@ class CodeRequest(BaseModel):
 @app.post("/generate-code")
 async def generate_code(req: CodeRequest):
     # TODO P4: pass full circuit JSON in prompt
-    response = ai.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": f"Generate {req.language} code for the given circuit. Return only code, no explanation."},
-            {"role": "user", "content": f"circuit_id: {req.circuit_id}"},
-        ],
+    response = ai.messages.create(
+        model=MODEL,
+        max_tokens=2048,
+        system=f"Generate {req.language} code for the given circuit. Return only code, no explanation.",
+        messages=[{"role": "user", "content": f"circuit_id: {req.circuit_id}"}],
     )
     return {
-        "code": response.choices[0].message.content,
+        "code": response.content[0].text,
         "language": req.language,
     }
