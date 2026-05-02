@@ -8,6 +8,7 @@ import os
 load_dotenv()
 
 ai = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
 MODEL = "claude-sonnet-4-20250514"
 
 app = FastAPI(title="CirKit API")
@@ -41,10 +42,12 @@ class ChatRequest(BaseModel):
 async def chat(req: ChatRequest):
     # TODO P1: pull conversation history, inject circuit state, parse JSON from response
     response = ai.messages.create(
-        model=MODEL,
+        model="claude-opus-4-5",
         max_tokens=1024,
         system="You are a circuit design assistant. Return valid circuit JSON.",
-        messages=[{"role": "user", "content": req.message}],
+        messages=[
+            {"role": "user", "content": req.message},
+        ],
     )
     reply = response.content[0].text
     return {
@@ -95,10 +98,12 @@ class CodeRequest(BaseModel):
 async def generate_code(req: CodeRequest):
     # TODO P4: pass full circuit JSON in prompt
     response = ai.messages.create(
-        model=MODEL,
+        model="claude-opus-4-5",
         max_tokens=2048,
         system=f"Generate {req.language} code for the given circuit. Return only code, no explanation.",
-        messages=[{"role": "user", "content": f"circuit_id: {req.circuit_id}"}],
+        messages=[
+            {"role": "user", "content": f"circuit_id: {req.circuit_id}"},
+        ],
     )
     return {
         "code": response.content[0].text,
