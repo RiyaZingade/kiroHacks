@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import ChatPanel from './ChatPanel'
 
-export default function ChatWidget({ circuit, setCircuit }) {
-  const [open, setOpen] = useState(false)
+export default function ChatWidget({ circuit, setCircuit, initialOpen = false }) {
+  const [open, setOpen] = useState(initialOpen)
 
   return (
     <div className="fixed bottom-4 left-4 z-50">
