@@ -1,5 +1,7 @@
 # CirKit — Systems Design Diagram
 
+🚀 **Live App**: [cirkitkirohacks.vercel.app/app](https://cirkitkirohacks.vercel.app/app) · 🛠 **[How We Used Kiro](KIRO_WRITEUP.md)** · 📖 **[README](README.md)**
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              USER (Browser)                                 │

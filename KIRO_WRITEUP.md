@@ -1,6 +1,6 @@
 # How We Used Kiro to Build CirKit
 
-🚀 **Live App**: [cirkitkirohacks.vercel.app/app](https://cirkitkirohacks.vercel.app/app) · 📐 **[System Design](SYSTEM_DESIGN.md)**
+🚀 **Live App**: [cirkitkirohacks.vercel.app/app](https://cirkitkirohacks.vercel.app/app) · 📐 **[System Design](SYSTEM_DESIGN.md)** · 📖 **[README](README.md)**
 
 ## The Challenge
 
