@@ -1,16 +1,61 @@
 {
   "components": [
-    { "id": "R1", "type": "resistor", "value": "10kΩ", "position": [3, 5] },
-    { "id": "LED1", "type": "led", "color": "red", "position": [5, 5] },
-    { "id": "BTN1", "type": "button", "position": [7, 5] }
+    { "id": "MCU", "type": "ic", "value": "ATmega328P", "position": [25, 20] },
+    { "id": "USB_MCU", "type": "ic", "value": "ATmega16U2", "position": [15, 12] },
+    { "id": "USB", "type": "connector", "value": "USB-B", "position": [5, 15] },
+    { "id": "PWR_JACK", "type": "connector", "value": "Power", "position": [8, 8] },
+    { "id": "RESET", "type": "button", "value": "Reset", "position": [20, 8] },
+    { "id": "PWR_LED", "type": "led", "value": "ON", "color": "green", "position": [35, 8] },
+    { "id": "LED13", "type": "led", "value": "L", "color": "yellow", "position": [40, 20] },
+    
+    { "id": "D0", "type": "connector", "value": "D0/RX", "position": [45, 12] },
+    { "id": "D1", "type": "connector", "value": "D1/TX", "position": [45, 14] },
+    { "id": "D2", "type": "connector", "value": "D2", "position": [45, 16] },
+    { "id": "D3", "type": "connector", "value": "D3~", "position": [45, 18] },
+    { "id": "D4", "type": "connector", "value": "D4", "position": [45, 20] },
+    { "id": "D5", "type": "connector", "value": "D5~", "position": [45, 22] },
+    { "id": "D6", "type": "connector", "value": "D6~", "position": [45, 24] },
+    { "id": "D7", "type": "connector", "value": "D7", "position": [45, 26] },
+    
+    { "id": "D8", "type": "connector", "value": "D8", "position": [42, 12] },
+    { "id": "D9", "type": "connector", "value": "D9~", "position": [42, 14] },
+    { "id": "D10", "type": "connector", "value": "D10~", "position": [42, 16] },
+    { "id": "D11", "type": "connector", "value": "D11~", "position": [42, 18] },
+    { "id": "D12", "type": "connector", "value": "D12", "position": [42, 20] },
+    { "id": "D13", "type": "connector", "value": "D13", "position": [42, 22] },
+    { "id": "GND1", "type": "connector", "value": "GND", "position": [42, 24] },
+    { "id": "AREF", "type": "connector", "value": "AREF", "position": [42, 26] },
+    
+    { "id": "A0", "type": "connector", "value": "A0", "position": [35, 30] },
+    { "id": "A1", "type": "connector", "value": "A1", "position": [33, 30] },
+    { "id": "A2", "type": "connector", "value": "A2", "position": [31, 30] },
+    { "id": "A3", "type": "connector", "value": "A3", "position": [29, 30] },
+    { "id": "A4", "type": "connector", "value": "A4/SDA", "position": [27, 30] },
+    { "id": "A5", "type": "connector", "value": "A5/SCL", "position": [25, 30] },
+    
+    { "id": "VIN", "type": "connector", "value": "VIN", "position": [15, 30] },
+    { "id": "GND2", "type": "connector", "value": "GND", "position": [17, 30] },
+    { "id": "GND3", "type": "connector", "value": "GND", "position": [19, 30] },
+    { "id": "V5", "type": "connector", "value": "5V", "position": [21, 30] },
+    { "id": "V33", "type": "connector", "value": "3.3V", "position": [23, 30] },
+    
+    { "id": "ICSP1", "type": "connector", "value": "ICSP", "position": [30, 12] },
+    { "id": "ICSP2", "type": "connector", "value": "ICSP", "position": [38, 8] }
   ],
   "connections": [
-    { "from": "VCC", "to": "R1.pin1" },
-    { "from": "R1.pin2", "to": "LED1.anode" },
-    { "from": "LED1.cathode", "to": "BTN1.pin1" },
-    { "from": "BTN1.pin2", "to": "GND" }
+    { "from": "USB", "to": "USB_MCU" },
+    { "from": "USB_MCU", "to": "MCU" },
+    { "from": "PWR_JACK", "to": "VIN" },
+    { "from": "V5", "to": "MCU" },
+    { "from": "D13", "to": "LED13.anode" },
+    { "from": "LED13.cathode", "to": "GND1" },
+    { "from": "RESET", "to": "MCU" },
+    { "from": "D0", "to": "MCU" },
+    { "from": "D1", "to": "MCU" },
+    { "from": "A0", "to": "MCU" },
+    { "from": "A1", "to": "MCU" }
   ],
-  "power": { "voltage": 5, "source": "VCC" },
+  "power": { "voltage": 5, "source": "USB/VIN" },
   "code": {
     "language": "arduino",
     "source": "",
@@ -22,9 +67,10 @@
     "software_setup": "",
     "safety_flags": []
   },
-  "canvas_mode": "agent",
+  "canvas_mode": "arduino",
   "metadata": {
-    "name": "Untitled Circuit",
-    "entry_point": "B"
+    "name": "Arduino UNO",
+    "board_type": "uno",
+    "entry_point": "USB"
   }
 }

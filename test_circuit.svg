@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
+  <!-- Arduino UNO Board Outline -->
+  <rect x="50" y="50" width="300" height="200" fill="#1a5490" stroke="#0f3460" stroke-width="2" rx="5"/>
+  
+  <!-- USB Connector -->
+  <rect x="10" y="120" width="40" height="20" fill="#c0c0c0" stroke="#999" stroke-width="1"/>
+  <text x="30" y="135" text-anchor="middle" fill="white" font-size="8">USB</text>
+  
+  <!-- Power Jack -->
+  <circle cx="30" cy="80" r="12" fill="#000" stroke="#333" stroke-width="1"/>
+  <text x="30" y="85" text-anchor="middle" fill="white" font-size="6">PWR</text>
+  
+  <!-- Main MCU -->
+  <rect x="200" y="140" width="80" height="40" fill="#1f2937" stroke="#374151" stroke-width="1"/>
+  <text x="240" y="165" text-anchor="middle" fill="white" font-size="10">ATmega328P</text>
+  
+  <!-- USB MCU -->
+  <rect x="120" y="100" width="60" height="30" fill="#1f2937" stroke="#374151" stroke-width="1"/>
+  <text x="150" y="120" text-anchor="middle" fill="white" font-size="8">ATmega16U2</text>
+  
+  <!-- Reset Button -->
+  <circle cx="100" cy="70" r="8" fill="#374151" stroke="#555" stroke-width="1"/>
+  <text x="100" y="75" text-anchor="middle" fill="white" font-size="6">RST</text>
+  
+  <!-- LEDs -->
+  <circle cx="280" cy="80" r="4" fill="#22c55e" stroke="#1f2937" stroke-width="1"/>
+  <text x="280" y="70" text-anchor="middle" fill="white" font-size="6">ON</text>
+  
+  <circle cx="300" cy="80" r="4" fill="#fbbf24" stroke="#1f2937" stroke-width="1"/>
+  <text x="300" y="70" text-anchor="middle" fill="white" font-size="6">L</text>
+  
+  <!-- Digital Pins -->
+  <text x="360" y="100" text-anchor="middle" fill="white" font-size="6">D0</text>
+  <text x="360" y="115" text-anchor="middle" fill="white" font-size="6">D1</text>
+  <text x="360" y="130" text-anchor="middle" fill="white" font-size="6">D2</text>
+  <text x="360" y="145" text-anchor="middle" fill="white" font-size="6">D3</text>
+  
+  <!-- Analog Pins -->
+  <text x="200" y="270" text-anchor="middle" fill="white" font-size="6">A0</text>
+  <text x="220" y="270" text-anchor="middle" fill="white" font-size="6">A1</text>
+  <text x="240" y="270" text-anchor="middle" fill="white" font-size="6">A2</text>
+  
+  <!-- Power Pins -->
+  <text x="120" y="270" text-anchor="middle" fill="white" font-size="6">VIN</text>
+  <text x="140" y="270" text-anchor="middle" fill="white" font-size="6">GND</text>
+  <text x="160" y="270" text-anchor="middle" fill="white" font-size="6">5V</text>
+  
+  <!-- Traces (example connections) -->
+  <path d="M 50 130 L 120 115" stroke="#fbbf24" stroke-width="2" fill="none"/>
+  <path d="M 180 115 L 200 160" stroke="#fbbf24" stroke-width="2" fill="none"/>
+</svg>
