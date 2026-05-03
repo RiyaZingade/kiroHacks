@@ -1,11 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 
-// P1 owns this file
+const WELCOME = { role: 'assistant', content: 'Hi! Describe a circuit and I\'ll build it, or ask me to modify the current one.' }
+
 export default function ChatPanel({ circuit, setCircuit }) {
-  const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Hi! Describe a circuit and I\'ll build it, or ask me to modify the current one.' }
-  ])
-  const [history, setHistory] = useState([])  // Claude-format history (no system messages)
+  const [messages, setMessages] = useState([WELCOME])
+  const [history, setHistory] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [contextWarning, setContextWarning] = useState(false)
@@ -19,37 +18,23 @@ export default function ChatPanel({ circuit, setCircuit }) {
     if (!input.trim() || loading) return
     const userText = input.trim()
     setInput('')
-    setMessages((m) => [...m, { role: 'user', content: userText }])
+    setMessages(m => [...m, { role: 'user', content: userText }])
     setLoading(true)
 
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: userText,
-          circuit: circuit,
-          history: history,
-        }),
+        body: JSON.stringify({ message: userText, circuit, history }),
       })
       const data = await res.json()
-
-      // Update chat display
-      setMessages((m) => [...m, { role: 'assistant', content: data.reply }])
-
-      // Update conversation history for next turn
-      setHistory((h) => [
-        ...h,
-        { role: 'user', content: userText },
-        { role: 'assistant', content: data.reply },
-      ])
-
-      // Update canvas if circuit changed
+      console.log('Chat response:', data)
+      setMessages(m => [...m, { role: 'assistant', content: data.reply }])
+      setHistory(h => [...h, { role: 'user', content: userText }, { role: 'assistant', content: data.reply }])
       if (data.updated_circuit) setCircuit(data.updated_circuit)
-
       setContextWarning(data.context_warning)
     } catch {
-      setMessages((m) => [...m, { role: 'assistant', content: '⚠ Could not reach the backend.' }])
+      setMessages(m => [...m, { role: 'assistant', content: '⚠ Could not reach the backend.' }])
     } finally {
       setLoading(false)
     }
@@ -57,15 +42,6 @@ export default function ChatPanel({ circuit, setCircuit }) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-        <span className="text-sm font-semibold text-gray-300">CirKit Agent</span>
-        {contextWarning && (
-          <span className="text-xs bg-yellow-900 text-yellow-300 px-2 py-1 rounded">
-            Context getting long — accuracy may drop
-          </span>
-        )}
-      </div>
-
       <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
