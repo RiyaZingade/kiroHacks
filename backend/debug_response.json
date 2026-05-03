@@ -1,0 +1,656 @@
+RAW RESPONSE:
+Looking at this Arduino UNO R3 schematic, I can identify the key components and their precise positions on the board. Let me create an accurate layout based on the standard Arduino UNO R3 dimensions and component placement.
+
+<circuit>
+{
+  "components": [
+    {"id": "USB", "type": "connector", "value": "USB-B", "position": [15, 8], "position_type": "percent"},
+    {"id": "PWR_JACK", "type": "connector", "value": "Power Jack", "position": [5, 45], "position_type": "percent"},
+    {"id": "MCU", "type": "ic", "value": "ATmega328P", "position": [55, 60], "position_type": "percent"},
+    {"id": "USB_MCU", "type": "ic", "value": "ATmega16U2", "position": [35, 25], "position_type": "percent"},
+    {"id": "RESET", "type": "button", "value": "Reset", "position": [25, 12], "position_type": "percent"},
+    {"id": "CRYSTAL1", "type": "crystal", "value": "16MHz", "position": [65, 75], "position_type": "percent"},
+    {"id": "CRYSTAL2", "type": "crystal", "value": "16MHz", "position": [45, 35], "position_type": "percent"},
+    {"id": "PWR_LED", "type": "led", "value": "ON", "color": "green", "position": [85, 18], "position_type": "percent"},
+    {"id": "LED_L", "type": "led", "value": "L", "color": "orange", "position": [80, 18], "position_type": "percent"},
+    {"id": "LED_RX", "type": "led", "value": "RX", "color": "yellow", "position": [75, 18], "position_type": "percent"},
+    {"id": "LED_TX", "type": "led", "value": "TX", "color": "yellow", "position": [70, 18], "position_type": "percent"},
+    {"id": "VREG", "type": "voltage_regulator", "value": "NCP1117ST50T3G", "position": [20, 65], "position_type": "percent"},
+    {"id": "D0", "type": "pin", "value": "D0/RX", "position": [96, 85], "position_type": "percent"},
+    {"id": "D1", "type": "pin", "value": "D1/TX", "position": [96, 80], "position_type": "percent"},
+    {"id": "D2", "type": "pin", "value": "D2", "position": [96, 75], "position_type": "percent"},
+    {"id": "D3", "type": "pin", "value": "D3~", "position": [96, 70], "position_type": "percent"},
+    {"id": "D4", "type": "pin", "value": "D4", "position": [96, 65], "position_type": "percent"},
+    {"id": "D5", "type": "pin", "value": "D5~", "position": [96, 60], "position_type": "percent"},
+    {"id": "D6", "type": "pin", "value": "D6~", "position": [96, 55], "position_type": "percent"},
+    {"id": "D7", "type": "pin", "value": "D7", "position": [96, 50], "position_type": "percent"},
+    {"id": "D8", "type": "pin", "value": "D8", "position": [96, 42], "position_type": "percent"},
+    {"id": "D9", "type": "pin", "value": "D9~", "position": [96, 37], "position_type": "percent"},
+    {"id": "D10", "type": "pin", "value": "D10~", "position": [96, 32], "position_type": "percent"},
+    {"id": "D11", "type": "pin", "value": "D11~", "position": [96, 27], "position_type": "percent"},
+    {"id": "D12", "type": "pin", "value": "D12", "position": [96, 22], "position_type": "percent"},
+    {"id": "D13", "type": "pin", "value": "D13", "position": [96, 17], "position_type": "percent"},
+    {"id": "GND1", "type": "pin", "value": "GND", "position": [96, 12], "position_type": "percent"},
+    {"id": "AREF", "type": "pin", "value": "AREF", "position": [96, 7], "position_type": "percent"},
+    {"id": "SDA", "type": "pin", "value": "SDA", "position": [88, 85], "position_type": "percent"},
+    {"id": "SCL", "type": "pin", "value": "SCL", "position": [88, 80], "position_type": "percent"},
+    {"id": "IOREF", "type": "pin", "value": "IOREF", "position": [4, 7], "position_type": "percent"},
+    {"id": "RESET_PIN", "type": "pin", "value": "RESET", "position": [4, 12], "position_type": "percent"},
+    {"id": "V3V3", "type": "pin", "value": "3.3V", "position": [4, 17], "position_type": "percent"},
+    {"id": "V5", "type": "pin", "value": "5V", "position": [4, 22], "position_type": "percent"},
+    {"id": "GND2", "type": "pin", "value": "GND", "position": [4, 27], "position_type": "percent"},
+    {"id": "GND3", "type": "pin", "value": "GND", "position": [4, 32], "position_type": "percent"},
+    {"id": "VIN", "type": "pin", "value": "VIN", "position": [4, 37], "position_type": "percent"},
+    {"id": "A0", "type": "pin", "value": "A0", "position": [4, 50], "position_type": "percent"},
+    {"id": "A1", "type": "pin", "value": "A1", "position": [4, 55], "position_type": "percent"},
+    {"id": "A2", "type": "pin", "value": "A2", "position": [4, 60], "position_type": "percent"},
+    {"id": "A3", "type": "pin", "value": "A3", "position": [4, 65], "position_type": "percent"},
+    {"id": "A4", "type": "pin", "value": "A4/SDA", "position": [4, 70], "position_type": "percent"},
+    {"id": "A5", "type": "pin", "value": "A5/SCL", "position": [4, 75], "position_type": "percent"},
+    {"id": "ICSP1", "type": "connector", "value": "ICSP", "position": [75, 45], "position_type": "percent"},
+    {"id": "ICSP2", "type": "connector", "value": "ICSP", "position": [55, 15], "position_type": "percent"}
+  ],
+  "connections": [
+    {"from": "USB", "to": "USB_MCU"},
+    {"from": "USB_MCU", "to": "MCU"},
+    {"from": "PWR_JACK", "to": "VREG"},
+    {"from": "VREG", "to": "V5"},
+    {"from": "V5", "to": "MCU"},
+    {"from": "D13", "to": "LED_L"},
+    {"from": "RESET", "to": "RESET_PIN"},
+    {"from": "CRYSTAL1", "to": "MCU"},
+    {"from": "CRYSTAL2", "to": "USB_MCU"},
+    {"from": "ICSP1", "to": "MCU"},
+    {"from": "ICSP2", "to": "USB_MCU"}
+  ],
+  "power": {"voltage": 5, "source": "USB/VIN"},
+  "canvas_mode": "arduino",
+  "metadata": {"name": "Arduino UNO R3", "entry_point": "USB"}
+}
+</circuit>
+
+PARSED REPLY:
+Looking at this Arduino UNO R3 schematic, I can identify the key components and their precise positions on the board. Let me create an accurate layout based on the standard Arduino UNO R3 dimensions and component placement.
+
+<circuit>
+{
+  "components": [
+    {"id": "USB", "type": "connector", "value": "USB-B", "position": [15, 8], "position_type": "percent"},
+    {"id": "PWR_JACK", "type": "connector", "value": "Power Jack", "position": [5, 45], "position_type": "percent"},
+    {"id": "MCU", "type": "ic", "value": "ATmega328P", "position": [55, 60], "position_type": "percent"},
+    {"id": "USB_MCU", "type": "ic", "value": "ATmega16U2", "position": [35, 25], "position_type": "percent"},
+    {"id": "RESET", "type": "button", "value": "Reset", "position": [25, 12], "position_type": "percent"},
+    {"id": "CRYSTAL1", "type": "crystal", "value": "16MHz", "position": [65, 75], "position_type": "percent"},
+    {"id": "CRYSTAL2", "type": "crystal", "value": "16MHz", "position": [45, 35], "position_type": "percent"},
+    {"id": "PWR_LED", "type": "led", "value": "ON", "color": "green", "position": [85, 18], "position_type": "percent"},
+    {"id": "LED_L", "type": "led", "value": "L", "color": "orange", "position": [80, 18], "position_type": "percent"},
+    {"id": "LED_RX", "type": "led", "value": "RX", "color": "yellow", "position": [75, 18], "position_type": "percent"},
+    {"id": "LED_TX", "type": "led", "value": "TX", "color": "yellow", "position": [70, 18], "position_type": "percent"},
+    {"id": "VREG", "type": "voltage_regulator", "value": "NCP1117ST50T3G", "position": [20, 65], "position_type": "percent"},
+    {"id": "D0", "type": "pin", "value": "D0/RX", "position": [96, 85], "position_type": "percent"},
+    {"id": "D1", "type": "pin", "value": "D1/TX", "position": [96, 80], "position_type": "percent"},
+    {"id": "D2", "type": "pin", "value": "D2", "position": [96, 75], "position_type": "percent"},
+    {"id": "D3", "type": "pin", "value": "D3~", "position": [96, 70], "position_type": "percent"},
+    {"id": "D4", "type": "pin", "value": "D4", "position": [96, 65], "position_type": "percent"},
+    {"id": "D5", "type": "pin", "value": "D5~", "position": [96, 60], "position_type": "percent"},
+    {"id": "D6", "type": "pin", "value": "D6~", "position": [96, 55], "position_type": "percent"},
+    {"id": "D7", "type": "pin", "value": "D7", "position": [96, 50], "position_type": "percent"},
+    {"id": "D8", "type": "pin", "value": "D8", "position": [96, 42], "position_type": "percent"},
+    {"id": "D9", "type": "pin", "value": "D9~", "position": [96, 37], "position_type": "percent"},
+    {"id": "D10", "type": "pin", "value": "D10~", "position": [96, 32], "position_type": "percent"},
+    {"id": "D11", "type": "pin", "value": "D11~", "position": [96, 27], "position_type": "percent"},
+    {"id": "D12", "type": "pin", "value": "D12", "position": [96, 22], "position_type": "percent"},
+    {"id": "D13", "type": "pin", "value": "D13", "position": [96, 17], "position_type": "percent"},
+    {"id": "GND1", "type": "pin", "value": "GND", "position": [96, 12], "position_type": "percent"},
+    {"id": "AREF", "type": "pin", "value": "AREF", "position": [96, 7], "position_type": "percent"},
+    {"id": "SDA", "type": "pin", "value": "SDA", "position": [88, 85], "position_type": "percent"},
+    {"id": "SCL", "type": "pin", "value": "SCL", "position": [88, 80], "position_type": "percent"},
+    {"id": "IOREF", "type": "pin", "value": "IOREF", "position": [4, 7], "position_type": "percent"},
+    {"id": "RESET_PIN", "type": "pin", "value": "RESET", "position": [4, 12], "position_type": "percent"},
+    {"id": "V3V3", "type": "pin", "value": "3.3V", "position": [4, 17], "position_type": "percent"},
+    {"id": "V5", "type": "pin", "value": "5V", "position": [4, 22], "position_type": "percent"},
+    {"id": "GND2", "type": "pin", "value": "GND", "position": [4, 27], "position_type": "percent"},
+    {"id": "GND3", "type": "pin", "value": "GND", "position": [4, 32], "position_type": "percent"},
+    {"id": "VIN", "type": "pin", "value": "VIN", "position": [4, 37], "position_type": "percent"},
+    {"id": "A0", "type": "pin", "value": "A0", "position": [4, 50], "position_type": "percent"},
+    {"id": "A1", "type": "pin", "value": "A1", "position": [4, 55], "position_type": "percent"},
+    {"id": "A2", "type": "pin", "value": "A2", "position": [4, 60], "position_type": "percent"},
+    {"id": "A3", "type": "pin", "value": "A3", "position": [4, 65], "position_type": "percent"},
+    {"id": "A4", "type": "pin", "value": "A4/SDA", "position": [4, 70], "position_type": "percent"},
+    {"id": "A5", "type": "pin", "value": "A5/SCL", "position": [4, 75], "position_type": "percent"},
+    {"id": "ICSP1", "type": "connector", "value": "ICSP", "position": [75, 45], "position_type": "percent"},
+    {"id": "ICSP2", "type": "connector", "value": "ICSP", "position": [55, 15], "position_type": "percent"}
+  ],
+  "connections": [
+    {"from": "USB", "to": "USB_MCU"},
+    {"from": "USB_MCU", "to": "MCU"},
+    {"from": "PWR_JACK", "to": "VREG"},
+    {"from": "VREG", "to": "V5"},
+    {"from": "V5", "to": "MCU"},
+    {"from": "D13", "to": "LED_L"},
+    {"from": "RESET", "to": "RESET_PIN"},
+    {"from": "CRYSTAL1", "to": "MCU"},
+    {"from": "CRYSTAL2", "to": "USB_MCU"},
+    {"from": "ICSP1", "to": "MCU"},
+    {"from": "ICSP2", "to": "USB_MCU"}
+  ],
+  "power": {"voltage": 5, "source": "USB/VIN"},
+  "canvas_mode": "arduino",
+  "metadata": {"name": "Arduino UNO R3", "entry_point": "USB"}
+}
+</circuit>
+
+PARSED CIRCUIT:
+{
+  "components": [
+    {
+      "id": "USB",
+      "type": "connector",
+      "value": "USB-B",
+      "position": [
+        15,
+        8
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "PWR_JACK",
+      "type": "connector",
+      "value": "Power Jack",
+      "position": [
+        5,
+        45
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "MCU",
+      "type": "ic",
+      "value": "ATmega328P",
+      "position": [
+        55,
+        60
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "USB_MCU",
+      "type": "ic",
+      "value": "ATmega16U2",
+      "position": [
+        35,
+        25
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "RESET",
+      "type": "button",
+      "value": "Reset",
+      "position": [
+        25,
+        12
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "CRYSTAL1",
+      "type": "crystal",
+      "value": "16MHz",
+      "position": [
+        65,
+        75
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "CRYSTAL2",
+      "type": "crystal",
+      "value": "16MHz",
+      "position": [
+        45,
+        35
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "PWR_LED",
+      "type": "led",
+      "value": "ON",
+      "color": "green",
+      "position": [
+        85,
+        18
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "LED_L",
+      "type": "led",
+      "value": "L",
+      "color": "orange",
+      "position": [
+        80,
+        18
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "LED_RX",
+      "type": "led",
+      "value": "RX",
+      "color": "yellow",
+      "position": [
+        75,
+        18
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "LED_TX",
+      "type": "led",
+      "value": "TX",
+      "color": "yellow",
+      "position": [
+        70,
+        18
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "VREG",
+      "type": "voltage_regulator",
+      "value": "NCP1117ST50T3G",
+      "position": [
+        20,
+        65
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "D0",
+      "type": "pin",
+      "value": "D0/RX",
+      "position": [
+        96,
+        85
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "D1",
+      "type": "pin",
+      "value": "D1/TX",
+      "position": [
+        96,
+        80
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "D2",
+      "type": "pin",
+      "value": "D2",
+      "position": [
+        96,
+        75
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "D3",
+      "type": "pin",
+      "value": "D3~",
+      "position": [
+        96,
+        70
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "D4",
+      "type": "pin",
+      "value": "D4",
+      "position": [
+        96,
+        65
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "D5",
+      "type": "pin",
+      "value": "D5~",
+      "position": [
+        96,
+        60
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "D6",
+      "type": "pin",
+      "value": "D6~",
+      "position": [
+        96,
+        55
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "D7",
+      "type": "pin",
+      "value": "D7",
+      "position": [
+        96,
+        50
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "D8",
+      "type": "pin",
+      "value": "D8",
+      "position": [
+        96,
+        42
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "D9",
+      "type": "pin",
+      "value": "D9~",
+      "position": [
+        96,
+        37
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "D10",
+      "type": "pin",
+      "value": "D10~",
+      "position": [
+        96,
+        32
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "D11",
+      "type": "pin",
+      "value": "D11~",
+      "position": [
+        96,
+        27
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "D12",
+      "type": "pin",
+      "value": "D12",
+      "position": [
+        96,
+        22
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "D13",
+      "type": "pin",
+      "value": "D13",
+      "position": [
+        96,
+        17
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "GND1",
+      "type": "pin",
+      "value": "GND",
+      "position": [
+        96,
+        12
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "AREF",
+      "type": "pin",
+      "value": "AREF",
+      "position": [
+        96,
+        7
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "SDA",
+      "type": "pin",
+      "value": "SDA",
+      "position": [
+        88,
+        85
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "SCL",
+      "type": "pin",
+      "value": "SCL",
+      "position": [
+        88,
+        80
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "IOREF",
+      "type": "pin",
+      "value": "IOREF",
+      "position": [
+        4,
+        7
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "RESET_PIN",
+      "type": "pin",
+      "value": "RESET",
+      "position": [
+        4,
+        12
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "V3V3",
+      "type": "pin",
+      "value": "3.3V",
+      "position": [
+        4,
+        17
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "V5",
+      "type": "pin",
+      "value": "5V",
+      "position": [
+        4,
+        22
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "GND2",
+      "type": "pin",
+      "value": "GND",
+      "position": [
+        4,
+        27
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "GND3",
+      "type": "pin",
+      "value": "GND",
+      "position": [
+        4,
+        32
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "VIN",
+      "type": "pin",
+      "value": "VIN",
+      "position": [
+        4,
+        37
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "A0",
+      "type": "pin",
+      "value": "A0",
+      "position": [
+        4,
+        50
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "A1",
+      "type": "pin",
+      "value": "A1",
+      "position": [
+        4,
+        55
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "A2",
+      "type": "pin",
+      "value": "A2",
+      "position": [
+        4,
+        60
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "A3",
+      "type": "pin",
+      "value": "A3",
+      "position": [
+        4,
+        65
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "A4",
+      "type": "pin",
+      "value": "A4/SDA",
+      "position": [
+        4,
+        70
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "A5",
+      "type": "pin",
+      "value": "A5/SCL",
+      "position": [
+        4,
+        75
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "ICSP1",
+      "type": "connector",
+      "value": "ICSP",
+      "position": [
+        75,
+        45
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "ICSP2",
+      "type": "connector",
+      "value": "ICSP",
+      "position": [
+        55,
+        15
+      ],
+      "position_type": "percent"
+    }
+  ],
+  "connections": [
+    {
+      "from": "USB",
+      "to": "USB_MCU"
+    },
+    {
+      "from": "USB_MCU",
+      "to": "MCU"
+    },
+    {
+      "from": "PWR_JACK",
+      "to": "VREG"
+    },
+    {
+      "from": "VREG",
+      "to": "V5"
+    },
+    {
+      "from": "V5",
+      "to": "MCU"
+    },
+    {
+      "from": "D13",
+      "to": "LED_L"
+    },
+    {
+      "from": "RESET",
+      "to": "RESET_PIN"
+    },
+    {
+      "from": "CRYSTAL1",
+      "to": "MCU"
+    },
+    {
+      "from": "CRYSTAL2",
+      "to": "USB_MCU"
+    },
+    {
+      "from": "ICSP1",
+      "to": "MCU"
+    },
+    {
+      "from": "ICSP2",
+      "to": "USB_MCU"
+    }
+  ],
+  "power": {
+    "voltage": 5,
+    "source": "USB/VIN"
+  },
+  "canvas_mode": "arduino",
+  "metadata": {
+    "name": "Arduino UNO R3",
+    "entry_point": "USB"
+  }
+}

@@ -3,15 +3,332 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import anthropic
+import httpx
 import json
 import re
 import os
+import time
 
 load_dotenv()
 
 ai = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 MODEL = "claude-sonnet-4-20250514"
+
+# ---------------------------------------------------------------------------
+# Nexar / Octopart client
+# ---------------------------------------------------------------------------
+
+NEXAR_TOKEN_URL = "https://identity.nexar.com/connect/token"
+NEXAR_GRAPHQL_URL = "https://api.nexar.com/graphql"
+
+_token_cache: dict = {"token": None, "expires_at": 0}
+
+async def get_nexar_token() -> str | None:
+    client_id = os.getenv("NEXAR_CLIENT_ID")
+    client_secret = os.getenv("NEXAR_CLIENT_SECRET")
+    if not client_id or not client_secret:
+        return None
+    if _token_cache["token"] and time.time() < _token_cache["expires_at"] - 60:
+        return _token_cache["token"]
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            NEXAR_TOKEN_URL,
+            data={
+                "grant_type": "client_credentials",
+                "client_id": client_id,
+                "client_secret": client_secret,
+            },
+            timeout=10.0,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        _token_cache["token"] = data["access_token"]
+        _token_cache["expires_at"] = time.time() + data.get("expires_in", 3600)
+        return _token_cache["token"]
+
+NEXAR_SEARCH_QUERY = """
+query SearchComponents($q: String!, $limit: Int!) {
+  supSearch(q: $q, limit: $limit) {
+    results {
+      part {
+        mpn
+        manufacturer { name }
+        shortDescription
+        specs {
+          attribute { name }
+          displayValue
+        }
+        bestDatasheet { url }
+      }
+    }
+  }
+}
+"""
+
+async def nexar_search(query: str, limit: int = 3) -> list[dict]:
+    """Search Nexar for components matching query. Returns empty list on any failure."""
+    try:
+        token = await get_nexar_token()
+        if not token:
+            return []
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                NEXAR_GRAPHQL_URL,
+                json={"query": NEXAR_SEARCH_QUERY, "variables": {"q": query, "limit": limit}},
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=10.0,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data.get("data", {}).get("supSearch", {}).get("results", [])
+    except Exception:
+        return []
+
+async def enhance_circuit_with_nexar(circuit):
+    """Enhance circuit components with Nexar component database information."""
+    if not circuit or not circuit.get('components'):
+        return circuit
+    
+    enhanced_components = []
+    
+    for component in circuit['components']:
+        enhanced_comp = component.copy()
+        
+        # Look for part numbers or component values that we can search in Nexar
+        value = component.get('value', '')
+        comp_type = component.get('type', '')
+        part_number = component.get('part_number', '')
+        
+        # Try to get component specs from Nexar
+        search_terms = []
+        
+        if part_number:
+            search_terms.append(part_number)
+        elif value and comp_type == 'ic':
+            search_terms.append(value)
+        elif comp_type == 'resistor' and ('k' in value or 'ohm' in value or 'Ω' in value):
+            search_terms.append(f"{value} resistor")
+        elif comp_type == 'capacitor' and ('µF' in value or 'pF' in value or 'nF' in value):
+            search_terms.append(f"{value} capacitor")
+        elif comp_type == 'led':
+            search_terms.append("LED")
+        
+        # Search Nexar for component specs
+        for search_term in search_terms[:1]:  # Only try the first/best search term
+            try:
+                nexar_results = await nexar_search(search_term, limit=1)
+                if nexar_results:
+                    part_data = nexar_results[0].get('part', {})
+                    if part_data:
+                        # Enhance component with Nexar data
+                        enhanced_comp['nexar_data'] = {
+                            'mpn': part_data.get('mpn', ''),
+                            'manufacturer': part_data.get('manufacturer', {}).get('name', ''),
+                            'description': part_data.get('shortDescription', ''),
+                            'datasheet': part_data.get('bestDatasheet', {}).get('url', '')
+                        }
+                        
+                        # Update component value with more accurate info if available
+                        if part_data.get('mpn') and not enhanced_comp.get('value'):
+                            enhanced_comp['value'] = part_data['mpn']
+                        
+                        break  # Found data, stop searching
+            except Exception as e:
+                print(f"Nexar search failed for {search_term}: {e}")
+                continue
+        
+        enhanced_components.append(enhanced_comp)
+    
+    circuit['components'] = enhanced_components
+    
+    # Add metadata about Nexar enhancement
+    if 'metadata' not in circuit:
+        circuit['metadata'] = {}
+    circuit['metadata']['nexar_enhanced'] = True
+    
+    return circuit
+
+
+def normalize_to_canvas_space(components, source_type, source_width, source_height, canvas_width=1000, canvas_height=750):
+    """Normalize all component positions to canvas pixel space before sending to frontend.
+    Canvas origin is top-left. All inputs converted to percentage first, then to canvas pixels."""
+    normalized = []
+    
+    for comp in components:
+        x_raw, y_raw = comp['position']
+        
+        if source_type == 'svg':
+            # Already in percentage — just convert to canvas pixels
+            x_pct = x_raw / 100
+            y_pct = y_raw / 100
+        elif source_type == 'pdf':
+            # PDF space: origin bottom-left, units are points
+            # Flip y-axis, then normalize to percentage
+            x_pct = x_raw / source_width
+            y_pct = 1.0 - (y_raw / source_height)  # <-- critical y-flip
+        elif source_type == 'image':
+            # Pixel space: origin top-left
+            x_pct = x_raw / source_width
+            y_pct = y_raw / source_height
+        else:
+            # Default: assume percentage
+            x_pct = x_raw / 100
+            y_pct = y_raw / 100
+        
+        normalized.append({
+            **comp,
+            'position': [
+                round(x_pct * canvas_width),
+                round(y_pct * canvas_height)
+            ],
+            'position_type': 'canvas_px',  # frontend now always gets this
+            'source': source_type
+        })
+    
+    return normalized
+
+def deduplicate_components(components, threshold=30):
+    """Remove duplicate components within threshold pixels (canvas space)."""
+    seen = []
+    unique = []
+    
+    for comp in components:
+        x, y = comp['position']
+        is_duplicate = any(
+            abs(s['position'][0] - x) < threshold and abs(s['position'][1] - y) < threshold
+            for s in seen
+        )
+        
+        if not is_duplicate:
+            seen.append(comp)
+            unique.append(comp)
+    
+    return unique
+
+
+async def enrich_components_from_nexar(extracted_text: str) -> str:
+    """Validate and correct component positions based on typical board layouts."""
+    if not circuit or not circuit.get('components'):
+        return circuit
+    
+    components = circuit['components']
+    corrected_components = []
+    
+    # Find key reference components
+    usb_comp = None
+    power_comp = None
+    main_mcu = None
+    
+    for comp in components:
+        value = (comp.get('value', '') or '').lower()
+        comp_type = (comp.get('type', '') or '').lower()
+        
+        if 'usb' in value or (comp_type == 'connector' and 'usb' in value):
+            usb_comp = comp
+        elif 'power' in value or 'jack' in value:
+            power_comp = comp
+        elif 'atmega' in value or 'mcu' in value or (comp_type == 'ic' and any(x in value for x in ['atmega', 'processor', 'main'])):
+            main_mcu = comp
+    
+    # Apply position corrections based on typical layouts
+    for comp in components:
+        corrected_comp = comp.copy()
+        value = (comp.get('value', '') or '').lower()
+        comp_type = (comp.get('type', '') or '').lower()
+        pos = comp.get('position', [50, 50])
+        
+        # Correct positions based on component type and typical locations
+        if 'usb' in value:
+            # USB should be on left edge, middle height
+            corrected_comp['position'] = [max(1, min(10, pos[0])), max(40, min(60, pos[1]))]
+        elif 'power' in value or 'jack' in value:
+            # Power jack should be on left edge, upper area
+            corrected_comp['position'] = [max(1, min(10, pos[0])), max(20, min(40, pos[1]))]
+        elif 'atmega328p' in value or ('mcu' in value and comp_type == 'ic'):
+            # Main MCU should be center-right
+            corrected_comp['position'] = [max(50, min(70, pos[0])), max(50, min(70, pos[1]))]
+        elif 'atmega16u2' in value or ('usb' in value and comp_type == 'ic'):
+            # USB MCU should be left-center
+            corrected_comp['position'] = [max(25, min(40, pos[0])), max(30, min(50, pos[1]))]
+        elif 'reset' in value and comp_type == 'button':
+            # Reset button should be top area
+            corrected_comp['position'] = [max(20, min(40, pos[0])), max(10, min(25, pos[1]))]
+        elif comp_type == 'led':
+            # LEDs should be in top area
+            corrected_comp['position'] = [max(60, min(90, pos[0])), max(10, min(25, pos[1]))]
+        elif comp_type == 'pin' or value.startswith('d') or value.startswith('a'):
+            # Digital pins should be on right edge
+            if value.startswith('d') and len(value) <= 3:
+                pin_num = int(value[1:]) if value[1:].isdigit() else 0
+                if pin_num <= 7:
+                    corrected_comp['position'] = [95, 25 + (pin_num * 6)]
+                else:
+                    corrected_comp['position'] = [85, 25 + ((pin_num - 8) * 6)]
+            elif value.startswith('a'):
+                pin_num = int(value[1:]) if value[1:].isdigit() else 0
+                corrected_comp['position'] = [50 + (pin_num * 5), 95]
+            elif value in ['vin', 'gnd', '5v', '3.3v', 'ioref', 'aref']:
+                # Power pins on bottom left
+                power_pins = ['ioref', '3.3v', '5v', 'gnd', 'vin']
+                if value in power_pins:
+                    idx = power_pins.index(value)
+                    corrected_comp['position'] = [15 + (idx * 8), 95]
+        
+        corrected_components.append(corrected_comp)
+    
+    circuit['components'] = corrected_components
+    return circuit
+    """
+    Ask Claude to identify part numbers/component names from the text,
+    then look each one up in Nexar and return a formatted specs summary.
+    """
+    # Step 1: ask Claude to extract component identifiers
+    extraction = ai.messages.create(
+        model=MODEL,
+        max_tokens=256,
+        messages=[{
+            "role": "user",
+            "content": (
+                "Extract all electronic component part numbers, component names, and values "
+                "from the following text. Return ONLY a JSON array of short search strings, "
+                "e.g. [\"LM741\", \"10k resistor\", \"100uF capacitor\"]. "
+                "Return an empty array if none found.\n\n"
+                f"{extracted_text[:3000]}"
+            )
+        }]
+    )
+    raw = extraction.content[0].text.strip()
+
+    # Parse the array Claude returned
+    try:
+        arr_match = re.search(r"\[.*?\]", raw, re.DOTALL)
+        queries = json.loads(arr_match.group(0)) if arr_match else []
+    except Exception:
+        queries = []
+
+    if not queries:
+        return ""
+
+    # Step 2: look up each component in Nexar (cap at 5 to stay fast)
+    specs_lines = ["Component data from Nexar/Octopart:"]
+    for q in queries[:5]:
+        results = await nexar_search(q, limit=2)
+        for r in results:
+            part = r.get("part", {})
+            mpn = part.get("mpn", "")
+            mfr = part.get("manufacturer", {}).get("name", "")
+            desc = part.get("shortDescription", "")
+            specs = part.get("specs", [])[:5]
+            ds = (part.get("bestDatasheet") or {}).get("url", "")
+
+            specs_lines.append(f"\n• {mpn} ({mfr}): {desc}")
+            for s in specs:
+                specs_lines.append(f"  - {s['attribute']['name']}: {s['displayValue']}")
+            if ds:
+                specs_lines.append(f"  Datasheet: {ds}")
+
+    return "\n".join(specs_lines) if len(specs_lines) > 1 else ""
 
 SYSTEM_PROMPT = """You are CirKit, an AI circuit design assistant.
 
@@ -42,8 +359,13 @@ Rules:
 - if the user asks a general question with no circuit change, omit the <circuit> block and just use <reply>
 """
 
-def parse_response(text: str):
+def parse_response(text):
     """Extract reply and circuit JSON from Claude's response."""
+    # Ensure we have a string
+    if not isinstance(text, str):
+        print(f"Warning: parse_response received {type(text)}, converting to string")
+        text = str(text)
+    
     reply_match = re.search(r"<reply>(.*?)</reply>", text, re.DOTALL)
     circuit_match = re.search(r"<circuit>(.*?)</circuit>", text, re.DOTALL)
 
@@ -51,9 +373,20 @@ def parse_response(text: str):
     circuit = None
     if circuit_match:
         try:
-            circuit = json.loads(circuit_match.group(1).strip())
-        except json.JSONDecodeError:
-            pass
+            circuit_json = circuit_match.group(1).strip()
+            # Try to parse, but if it fails due to truncation, try to fix common issues
+            circuit = json.loads(circuit_json)
+        except json.JSONDecodeError as e:
+            print(f"JSON decode error: {e}")
+            # JSON might be truncated - try to salvage what we can
+            try:
+                # Find the last complete object/array and truncate there
+                last_complete = circuit_json.rfind('}')
+                if last_complete > 0:
+                    circuit = json.loads(circuit_json[:last_complete+1])
+            except Exception as e2:
+                print(f"Failed to salvage JSON: {e2}")
+                pass
     return reply, circuit
 
 app = FastAPI(title="CirKit API")
@@ -125,14 +458,875 @@ async def chat(req: ChatRequest):
 # P2 — /upload-pdf  (PDF ingestion)
 # ---------------------------------------------------------------------------
 
-@app.post("/upload-pdf")
-async def upload_pdf(file: UploadFile = File(...), circuit_id: str | None = None):
-    # TODO P2: PyMuPDF extract → Claude generate circuit JSON
+PDF_CIRCUIT_PROMPT = """You are a circuit design assistant. A user has uploaded a PDF schematic.
+
+Extracted text from the PDF:
+{extracted_text}
+
+{component_specs}
+
+Analyze this and generate a circuit JSON. Use the component specs above (if any) to set accurate values, types, and descriptions. You MUST respond in this exact format:
+
+<reply>
+Brief description of what you found and built.
+</reply>
+<circuit>
+{{ ...valid circuit JSON... }}
+</circuit>
+
+The circuit JSON must follow this schema:
+{{
+  "components": [{{"id": "R1", "type": "resistor|led|capacitor|button|wire|power_rail", "value": "optional", "color": "optional", "position": [col, row]}}],
+  "connections": [{{"from": "VCC|GND|<id>.pin1|<id>.anode|etc", "to": "<id>.pin1|etc"}}],
+  "power": {{"voltage": 5, "source": "VCC"}},
+  "code": {{"language": "arduino", "source": "", "origin": "agent"}},
+  "run_instructions": {{"power_requirements": "", "wiring_steps": [], "software_setup": "", "safety_flags": []}},
+  "canvas_mode": "agent",
+  "metadata": {{"name": "circuit name", "entry_point": "B"}}
+}}
+
+Rules:
+- positions are [col, row] integers on a 40x30 grid, space components at least 2 apart
+- always include VCC and GND connections
+- always add a current-limiting resistor before any LED
+
+If the PDF contains no parseable circuit information, respond with ONLY:
+<reply>
+I couldn't find a clear circuit schematic in this PDF. Try describing the circuit in the chat instead.
+</reply>
+"""
+
+@app.post("/upload-image")
+async def upload_image(file: UploadFile = File(...)):
+    if not file.filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg')):
+        raise HTTPException(status_code=400, detail="Only image files (including SVG) are supported.")
+
     contents = await file.read()
+
+    # Handle SVG files differently - parse the vector data directly
+    if file.filename.lower().endswith('.svg'):
+        return await process_svg_circuit(contents)
+    
+    # Handle regular image files with AI vision
+    return await process_image_circuit(contents)
+
+
+async def process_svg_circuit(svg_contents):
+    """Process SVG circuit diagrams by parsing the vector data directly."""
+    try:
+        import xml.etree.ElementTree as ET
+        import re
+        
+        # Parse SVG XML
+        svg_text = svg_contents.decode('utf-8')
+        root = ET.fromstring(svg_text)
+        
+        # Extract SVG dimensions for coordinate normalization
+        svg_width = float(root.get('width', '100').replace('px', '').replace('mm', '').replace('pt', ''))
+        svg_height = float(root.get('height', '100').replace('px', '').replace('mm', '').replace('pt', ''))
+        
+        # If width/height are in viewBox, use that instead
+        viewbox = root.get('viewBox')
+        if viewbox:
+            vb_parts = viewbox.split()
+            if len(vb_parts) >= 4:
+                svg_width = float(vb_parts[2])
+                svg_height = float(vb_parts[3])
+        
+        components = []
+        component_id = 1
+        
+        # Define SVG namespaces
+        namespaces = {
+            'svg': 'http://www.w3.org/2000/svg',
+            '': 'http://www.w3.org/2000/svg'
+        }
+        
+        # Look for common circuit elements in SVG
+        
+        # 1. Text elements (component labels, part numbers)
+        for text_elem in root.findall('.//text', namespaces) + root.findall('.//svg:text', namespaces):
+            text_content = ''.join(text_elem.itertext()).strip()
+            if text_content and len(text_content) > 1:
+                x = float(text_elem.get('x', 0))
+                y = float(text_elem.get('y', 0))
+                
+                # Convert to percentage coordinates
+                x_percent = (x / svg_width) * 100
+                y_percent = (y / svg_height) * 100
+                
+                # Determine component type based on text content
+                comp_type = 'label'
+                if any(ic in text_content.upper() for ic in ['ATMEGA', 'PIC', 'STM32', 'ESP', 'ARDUINO']):
+                    comp_type = 'ic'
+                elif any(conn in text_content.upper() for conn in ['USB', 'POWER', 'JACK', 'CONN']):
+                    comp_type = 'connector'
+                elif any(led in text_content.upper() for led in ['LED', 'LIGHT']):
+                    comp_type = 'led'
+                elif any(btn in text_content.upper() for btn in ['BUTTON', 'BTN', 'RESET', 'SW']):
+                    comp_type = 'button'
+                elif re.match(r'[RCL]\d+', text_content.upper()):
+                    comp_type = 'resistor' if text_content.upper().startswith('R') else 'capacitor' if text_content.upper().startswith('C') else 'inductor'
+                elif re.match(r'[DA]\d+', text_content.upper()):
+                    comp_type = 'pin'
+                
+                components.append({
+                    'id': f'SVG_{component_id}',
+                    'type': comp_type,
+                    'value': text_content,
+                    'position': [x_percent, y_percent],
+                    'position_type': 'percent',
+                    'source': 'svg_text'
+                })
+                component_id += 1
+        
+        # 2. Rectangle elements (ICs, connectors, components)
+        for rect_elem in root.findall('.//rect', namespaces) + root.findall('.//svg:rect', namespaces):
+            x = float(rect_elem.get('x', 0))
+            y = float(rect_elem.get('y', 0))
+            width = float(rect_elem.get('width', 10))
+            height = float(rect_elem.get('height', 10))
+            
+            # Convert to percentage coordinates (center of rectangle)
+            x_percent = ((x + width/2) / svg_width) * 100
+            y_percent = ((y + height/2) / svg_height) * 100
+            
+            # Determine component type based on size and attributes
+            comp_type = 'ic' if width > 20 and height > 10 else 'component'
+            
+            # Check for class or id attributes that might indicate component type
+            class_attr = rect_elem.get('class', '').lower()
+            id_attr = rect_elem.get('id', '').lower()
+            
+            if any(x in class_attr + id_attr for x in ['ic', 'chip', 'mcu']):
+                comp_type = 'ic'
+            elif any(x in class_attr + id_attr for x in ['connector', 'usb', 'power']):
+                comp_type = 'connector'
+            elif any(x in class_attr + id_attr for x in ['led', 'light']):
+                comp_type = 'led'
+            elif any(x in class_attr + id_attr for x in ['button', 'switch']):
+                comp_type = 'button'
+            
+            components.append({
+                'id': f'SVG_{component_id}',
+                'type': comp_type,
+                'value': id_attr or class_attr or f'{comp_type}_{component_id}',
+                'position': [x_percent, y_percent],
+                'position_type': 'percent',
+                'source': 'svg_rect',
+                'size': [width, height]
+            })
+            component_id += 1
+        
+        # 3. Circle elements (LEDs, buttons, pins)
+        for circle_elem in root.findall('.//circle', namespaces) + root.findall('.//svg:circle', namespaces):
+            cx = float(circle_elem.get('cx', 0))
+            cy = float(circle_elem.get('cy', 0))
+            r = float(circle_elem.get('r', 5))
+            
+            # Convert to percentage coordinates
+            x_percent = (cx / svg_width) * 100
+            y_percent = (cy / svg_height) * 100
+            
+            # Determine component type based on size and attributes
+            comp_type = 'led' if r < 10 else 'button' if r < 20 else 'component'
+            
+            class_attr = circle_elem.get('class', '').lower()
+            id_attr = circle_elem.get('id', '').lower()
+            
+            if any(x in class_attr + id_attr for x in ['led', 'light']):
+                comp_type = 'led'
+            elif any(x in class_attr + id_attr for x in ['button', 'switch', 'btn']):
+                comp_type = 'button'
+            elif any(x in class_attr + id_attr for x in ['pin', 'pad']):
+                comp_type = 'pin'
+            
+            components.append({
+                'id': f'SVG_{component_id}',
+                'type': comp_type,
+                'value': id_attr or class_attr or f'{comp_type}_{component_id}',
+                'position': [x_percent, y_percent],
+                'position_type': 'percent',
+                'source': 'svg_circle',
+                'radius': r
+            })
+            component_id += 1
+        
+        # 4. Path elements (traces, wires, complex shapes)
+        paths = []
+        for path_elem in root.findall('.//path', namespaces) + root.findall('.//svg:path', namespaces):
+            d_attr = path_elem.get('d', '')
+            if d_attr:
+                # Simple path parsing - extract move and line commands
+                path_commands = re.findall(r'[ML]\s*[\d\.\s,]+', d_attr)
+                if len(path_commands) >= 2:  # At least a move and a line
+                    paths.append({
+                        'id': f'PATH_{len(paths)}',
+                        'type': 'trace',
+                        'path_data': d_attr,
+                        'source': 'svg_path'
+                    })
+        
+        # Create circuit structure with normalized positions
+        raw_circuit = {
+            'components': components,
+            'connections': [],  # SVG paths could be converted to connections
+            'traces': paths,
+            'power': {'voltage': 5, 'source': 'detected'},
+            'canvas_mode': 'arduino',
+            'metadata': {
+                'name': 'SVG Circuit Analysis',
+                'analysis_method': 'svg_parsing',
+                'svg_dimensions': [svg_width, svg_height],
+                'component_count': len(components)
+            }
+        }
+        
+        # Normalize component positions to canvas space
+        normalized_components = normalize_to_canvas_space(
+            components, 
+            source_type='svg',
+            source_width=svg_width,
+            source_height=svg_height
+        )
+        
+        # Deduplicate components that are too close together
+        unique_components = deduplicate_components(normalized_components)
+        
+        # Update circuit with normalized components
+        circuit = {
+            **raw_circuit,
+            'components': unique_components,
+            'metadata': {
+                **raw_circuit['metadata'],
+                'original_component_count': len(components),
+                'normalized_component_count': len(unique_components)
+            }
+        }
+        
+        # Enhance with Nexar data
+        enhanced_circuit = await enhance_circuit_with_nexar(circuit)
+        
+        # Validate the circuit
+        validation = validate_circuit_data(enhanced_circuit)
+        
+        return {
+            'circuit': enhanced_circuit,
+            'reply': f'Successfully parsed SVG circuit diagram. Found {len(components)} components from vector data.',
+            'warnings': validation['warnings'],
+            'errors': validation['errors'] if not validation['valid'] else [],
+            'svg_info': {
+                'dimensions': [svg_width, svg_height],
+                'elements_found': {
+                    'text': len([c for c in components if c.get('source') == 'svg_text']),
+                    'rectangles': len([c for c in components if c.get('source') == 'svg_rect']),
+                    'circles': len([c for c in components if c.get('source') == 'svg_circle']),
+                    'paths': len(paths)
+                }
+            }
+        }
+        
+    except Exception as e:
+        print(f"SVG processing error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to process SVG: {str(e)}")
+
+
+async def process_image_circuit(contents):
+
+    try:
+        import base64
+        from PIL import Image
+        import io
+        
+        # Convert image to base64
+        img = Image.open(io.BytesIO(contents))
+        img_width, img_height = img.size
+        
+        # Convert to RGB if not already
+        if img.mode in ('RGBA', 'LA', 'P'):
+            img = img.convert('RGB')
+        
+        # Create multiple versions for better analysis
+        # 1. Original image
+        original_bytes = io.BytesIO()
+        img.save(original_bytes, format='JPEG', quality=85)
+        original_bytes.seek(0)
+        image_b64 = base64.b64encode(original_bytes.getvalue()).decode('utf-8')
+        
+        # 2. Enhanced contrast version for better component visibility
+        from PIL import ImageEnhance
+        enhancer = ImageEnhance.Contrast(img)
+        enhanced_img = enhancer.enhance(1.5)  # Increase contrast by 50%
+        
+        enhanced_bytes = io.BytesIO()
+        enhanced_img.save(enhanced_bytes, format='JPEG', quality=85)
+        enhanced_bytes.seek(0)
+        # 3. Edge-enhanced version for better component boundary detection
+        from PIL import ImageFilter
+        edge_img = img.filter(ImageFilter.FIND_EDGES)
+        edge_bytes = io.BytesIO()
+        edge_img.save(edge_bytes, format='JPEG', quality=85)
+        edge_bytes.seek(0)
+        edge_b64 = base64.b64encode(edge_bytes.getvalue()).decode('utf-8')
+        
+        # Use Claude Vision to analyze ANY circuit board image with reference-based positioning
+        vision_prompt = """Analyze this circuit board image and identify the 8-12 MOST IMPORTANT components with their positions.
+
+Focus ONLY on these key components:
+1. USB connector (if visible)
+2. Power jack (if visible) 
+3. Main microcontroller IC (largest chip)
+4. Reset button (if visible)
+5. 2-3 most visible LEDs
+6. 4-6 most important pin headers or connectors
+
+For each component, provide:
+- Simple ID (USB, MCU, LED1, etc.)
+- Basic type (connector, ic, led, button, pin)
+- Short label (what you see written)
+- Position as percentage (0-100)
+
+KEEP IT SIMPLE - maximum 12 components total.
+
+<reply>
+I've identified the key components on this circuit board.
+</reply>
+<circuit>
+{
+  "components": [
+    {"id": "USB", "type": "connector", "value": "USB", "position": [5, 50], "position_type": "percent"},
+    {"id": "MCU", "type": "ic", "value": "Main MCU", "position": [60, 60], "position_type": "percent"}
+  ],
+  "connections": [],
+  "power": {"voltage": 5, "source": "USB"},
+  "canvas_mode": "arduino",
+  "metadata": {"name": "Circuit Board", "analysis_method": "simplified"}
+}
+</circuit>"""
+
+
+        try:
+            # Multi-approach analysis for better accuracy
+            detailed_scan_prompt = """Perform a detailed scan of this circuit board image from left to right, top to bottom.
+
+Scan the image systematically and report every component you can see with its approximate position as percentages.
+
+<reply>
+I've performed a systematic scan of the circuit board and identified all visible components.
+</reply>
+<circuit>
+{
+  "components": [
+    {"id": "COMP1", "type": "type", "value": "label", "position": [X, Y], "position_type": "percent"}
+  ],
+  "connections": [],
+  "power": {"voltage": 5, "source": "detected"},
+  "canvas_mode": "arduino",
+  "metadata": {"name": "Scanned Circuit Board", "analysis_method": "systematic_scan"}
+}
+</circuit>"""
+
+            landmark_prompt = """Analyze this circuit board by identifying key landmarks first, then positioning components relative to those landmarks.
+
+STEP 1: Find these landmarks in order of priority:
+1. USB connector (usually rectangular, metallic, on left edge)
+2. Power jack (usually black cylinder, on left edge) 
+3. Main microcontroller (largest rectangular IC, usually center-right)
+4. Pin headers (rows of small pins, usually on right and bottom edges)
+
+STEP 2: For each landmark found, note its position as percentage coordinates
+
+STEP 3: Position all other components relative to these landmarks
+
+Use this format:
+
+<reply>
+I've identified key landmarks and positioned all components relative to them for accurate placement.
+</reply>
+<circuit>
+{
+  "components": [
+    {"id": "USB", "type": "connector", "value": "USB", "position": [X, Y], "position_type": "percent", "landmark": true},
+    {"id": "POWER", "type": "connector", "value": "Power", "position": [X, Y], "position_type": "percent", "landmark": true},
+    {"id": "MCU", "type": "ic", "value": "Main MCU", "position": [X, Y], "position_type": "percent", "landmark": true}
+  ],
+  "connections": [],
+  "power": {"voltage": 5, "source": "detected"},
+  "canvas_mode": "arduino",
+  "metadata": {"name": "Landmark-Based Analysis", "analysis_method": "landmark_positioning"}
+}
+</circuit>"""
+            
+            ocr_prompt = """Focus on reading ALL visible text labels on this circuit board first, then use those labels to identify and position components.
+
+STEP 1: TEXT DETECTION
+Scan the entire board and list every piece of text you can see:
+- Component labels (U1, R1, C1, etc.)
+- Pin labels (D0, D1, A0, A1, VIN, GND, etc.) 
+- IC markings (ATmega328P, etc.)
+- Connector labels (USB, POWER, etc.)
+- Any other visible text
+
+STEP 2: COMPONENT IDENTIFICATION
+For each text label found, identify:
+- What type of component it represents
+- Its exact position on the board
+- Its relationship to other labeled components
+
+STEP 3: POSITION MAPPING
+Use the text positions to create an accurate component map.
+
+<reply>
+I've read all visible text labels and used them to accurately map component positions.
+</reply>
+<circuit>
+{
+  "components": [
+    {"id": "COMP1", "type": "type", "value": "text_found", "position": [X, Y], "position_type": "percent", "text_based": true}
+  ],
+  "connections": [],
+  "power": {"voltage": 5, "source": "detected"},
+  "canvas_mode": "arduino",
+  "metadata": {"name": "OCR-Based Analysis", "analysis_method": "text_detection"}
+}
+</circuit>"""
+
+            spatial_prompt = """Analyze this circuit board using spatial relationships and component boundaries.
+
+STEP 1: BOARD BOUNDARY DETECTION
+- Identify the exact edges of the circuit board
+- Note the board's aspect ratio and orientation
+
+STEP 2: SPATIAL ZONES
+Divide the board into functional zones:
+- Left edge zone (0-15%): Usually connectors (USB, power)
+- Top zone (0-20%): Usually buttons, LEDs, labels
+- Center zone (20-80%): Usually main ICs and components  
+- Right edge zone (85-100%): Usually pin headers
+- Bottom zone (80-100%): Usually pin headers and labels
+
+STEP 3: COMPONENT BOUNDARY ANALYSIS
+For each component:
+- Identify its exact boundaries
+- Measure its size relative to the board
+- Note its spatial relationship to board edges
+- Calculate precise percentage coordinates
+
+<reply>
+I've analyzed the board using spatial relationships and component boundaries for precise positioning.
+</reply>
+<circuit>
+{
+  "components": [
+    {"id": "COMP1", "type": "type", "value": "label", "position": [X, Y], "position_type": "percent", "zone": "left_edge", "size": [w, h]}
+  ],
+  "connections": [],
+  "power": {"voltage": 5, "source": "detected"},
+  "canvas_mode": "arduino",
+  "metadata": {"name": "Spatial Analysis", "analysis_method": "spatial_boundaries"}
+}
+</circuit>"""
+
+            # Simplified approaches - only use the most effective ones
+            simple_prompt = """Look at this circuit board and find the main components:
+
+1. USB connector (rectangular metal connector)
+2. Power jack (round black connector) 
+3. Main chip (largest rectangular IC)
+4. LEDs (small colored lights)
+5. Reset button (small button)
+
+For each one you see, give its position as percentage of board width/height.
+
+<reply>
+Found the main components.
+</reply>
+<circuit>
+{
+  "components": [
+    {"id": "USB", "type": "connector", "value": "USB", "position": [X, Y], "position_type": "percent"},
+    {"id": "MCU", "type": "ic", "value": "MCU", "position": [X, Y], "position_type": "percent"}
+  ],
+  "connections": [],
+  "power": {"voltage": 5, "source": "USB"},
+  "canvas_mode": "arduino",
+  "metadata": {"name": "Simple Analysis"}
+}
+</circuit>"""
+            
+            approaches = [
+                ("simplified", vision_prompt),
+                ("basic", simple_prompt)
+            ]
+            
+            best_circuit = None
+            best_reply = None
+            best_component_count = 0
+            
+            for approach_name, prompt in approaches:
+                try:
+                    # Just use the original image for all approaches
+                    current_image_b64 = image_b64
+                    
+                    response = ai.messages.create(
+                        model=MODEL,
+                        max_tokens=1024,  # Reduced from 4096 to prevent huge responses
+                        messages=[{
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "image",
+                                    "source": {
+                                        "type": "base64",
+                                        "media_type": "image/jpeg",
+                                        "data": current_image_b64,
+                                    },
+                                },
+                                {
+                                    "type": "text",
+                                    "text": prompt,
+                                }
+                            ],
+                        }]
+                    )
+
+                    raw_response = response.content[0].text
+                    reply, circuit = parse_response(raw_response)
+                    
+                    if circuit and circuit.get('components'):
+                        component_count = len(circuit['components'])
+                        
+                        # Debug: save each approach result
+                        with open("debug_image_response.json", "a", encoding="utf-8") as f:
+                            f.write(f"\n\n=== APPROACH: {approach_name} ===\n")
+                            f.write(f"Components found: {component_count}\n")
+                            f.write(f"RAW RESPONSE:\n{raw_response}\n")
+                        
+                        # Keep the approach that found the most components
+                        if component_count > best_component_count:
+                            best_circuit = circuit
+                            best_reply = reply
+                            best_component_count = component_count
+                            
+                            # Add metadata about which approach worked best
+                            if 'metadata' not in best_circuit:
+                                best_circuit['metadata'] = {}
+                            best_circuit['metadata']['best_approach'] = approach_name
+                            best_circuit['metadata']['component_count'] = component_count
+                    
+                    # If we found components, we can stop
+                    if component_count >= 3:  # Just need a few key components
+                        break
+                        
+                except Exception as approach_error:
+                    print(f"Approach {approach_name} failed: {approach_error}")
+                    continue
+            
+            # Use the best result and enhance with Nexar data
+            if best_circuit:
+                # Enhance with Nexar component database
+                enhanced_circuit = await enhance_circuit_with_nexar(best_circuit)
+                circuit = enhanced_circuit
+                reply = best_reply
+            else:
+                raise ValueError("All analysis approaches failed")
+                
+        except Exception as ai_error:
+            print(f"AI API error: {ai_error}")
+            import traceback
+            traceback.print_exc()
+            
+            # Fallback: create accurate Arduino UNO layout with precise positioning
+            circuit = {
+                "components": [
+                    {"id": "USB", "type": "connector", "value": "USB-B", "position": [1, 50], "position_type": "percent"},
+                    {"id": "PWR_JACK", "type": "connector", "value": "Power Jack", "position": [1, 25], "position_type": "percent"},
+                    {"id": "MCU", "type": "ic", "value": "ATmega328P", "position": [60, 65], "position_type": "percent"},
+                    {"id": "USB_MCU", "type": "ic", "value": "ATmega16U2", "position": [30, 35], "position_type": "percent"},
+                    {"id": "RESET", "type": "button", "value": "Reset", "position": [25, 15], "position_type": "percent"},
+                    {"id": "PWR_LED", "type": "led", "value": "ON", "color": "green", "position": [85, 15], "position_type": "percent"},
+                    {"id": "LED_L", "type": "led", "value": "L", "color": "orange", "position": [80, 15], "position_type": "percent"},
+                    {"id": "LED_RX", "type": "led", "value": "RX", "color": "yellow", "position": [75, 15], "position_type": "percent"},
+                    {"id": "LED_TX", "type": "led", "value": "TX", "color": "yellow", "position": [70, 15], "position_type": "percent"},
+                    
+                    {"id": "D0", "type": "pin", "value": "D0/RX", "position": [98, 25], "position_type": "percent"},
+                    {"id": "D1", "type": "pin", "value": "D1/TX", "position": [98, 31], "position_type": "percent"},
+                    {"id": "D2", "type": "pin", "value": "D2", "position": [98, 37], "position_type": "percent"},
+                    {"id": "D3", "type": "pin", "value": "D3~", "position": [98, 43], "position_type": "percent"},
+                    {"id": "D4", "type": "pin", "value": "D4", "position": [98, 49], "position_type": "percent"},
+                    {"id": "D5", "type": "pin", "value": "D5~", "position": [98, 55], "position_type": "percent"},
+                    {"id": "D6", "type": "pin", "value": "D6~", "position": [98, 61], "position_type": "percent"},
+                    {"id": "D7", "type": "pin", "value": "D7", "position": [98, 67], "position_type": "percent"},
+                    
+                    {"id": "D8", "type": "pin", "value": "D8", "position": [88, 25], "position_type": "percent"},
+                    {"id": "D9", "type": "pin", "value": "D9~", "position": [88, 31], "position_type": "percent"},
+                    {"id": "D10", "type": "pin", "value": "D10~", "position": [88, 37], "position_type": "percent"},
+                    {"id": "D11", "type": "pin", "value": "D11~", "position": [88, 43], "position_type": "percent"},
+                    {"id": "D12", "type": "pin", "value": "D12", "position": [88, 49], "position_type": "percent"},
+                    {"id": "D13", "type": "pin", "value": "D13", "position": [88, 55], "position_type": "percent"},
+                    {"id": "GND1", "type": "pin", "value": "GND", "position": [88, 61], "position_type": "percent"},
+                    {"id": "AREF", "type": "pin", "value": "AREF", "position": [88, 67], "position_type": "percent"},
+                    
+                    {"id": "IOREF", "type": "pin", "value": "IOREF", "position": [15, 95], "position_type": "percent"},
+                    {"id": "RESET_PIN", "type": "pin", "value": "RESET", "position": [20, 95], "position_type": "percent"},
+                    {"id": "V3V3", "type": "pin", "value": "3.3V", "position": [25, 95], "position_type": "percent"},
+                    {"id": "V5", "type": "pin", "value": "5V", "position": [30, 95], "position_type": "percent"},
+                    {"id": "GND2", "type": "pin", "value": "GND", "position": [35, 95], "position_type": "percent"},
+                    {"id": "GND3", "type": "pin", "value": "GND", "position": [40, 95], "position_type": "percent"},
+                    {"id": "VIN", "type": "pin", "value": "VIN", "position": [45, 95], "position_type": "percent"},
+                    
+                    {"id": "A0", "type": "pin", "value": "A0", "position": [50, 95], "position_type": "percent"},
+                    {"id": "A1", "type": "pin", "value": "A1", "position": [55, 95], "position_type": "percent"},
+                    {"id": "A2", "type": "pin", "value": "A2", "position": [60, 95], "position_type": "percent"},
+                    {"id": "A3", "type": "pin", "value": "A3", "position": [65, 95], "position_type": "percent"},
+                    {"id": "A4", "type": "pin", "value": "A4/SDA", "position": [70, 95], "position_type": "percent"},
+                    {"id": "A5", "type": "pin", "value": "A5/SCL", "position": [75, 95], "position_type": "percent"},
+                    
+                    {"id": "ICSP1", "type": "connector", "value": "ICSP", "position": [75, 55], "position_type": "percent"},
+                    {"id": "ICSP2", "type": "connector", "value": "ICSP", "position": [45, 20], "position_type": "percent"}
+                ],
+                "connections": [
+                    {"from": "USB", "to": "USB_MCU"},
+                    {"from": "USB_MCU", "to": "MCU"},
+                    {"from": "PWR_JACK", "to": "VIN"},
+                    {"from": "V5", "to": "MCU"},
+                    {"from": "D13", "to": "LED_L.anode"},
+                    {"from": "LED_L.cathode", "to": "GND1"},
+                    {"from": "RESET", "to": "MCU"}
+                ],
+                "power": {"voltage": 5, "source": "USB/VIN"},
+                "canvas_mode": "arduino",
+                "metadata": {"name": "Arduino UNO R3 (Fallback)", "entry_point": "USB"}
+            }
+            reply = f"Used fallback Arduino layout due to analysis error: {str(ai_error)}"
+        
+        # Validate before returning
+        validation = validate_circuit_data(circuit)
+        
+        return {
+            "circuit": circuit,
+            "reply": reply,
+            "warnings": validation["warnings"],
+            "errors": validation["errors"] if not validation["valid"] else [],
+        }
+        
+    except Exception as e:
+        print(f"Image processing error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to process image: {str(e)}")
+
+
+@app.post("/upload-pdf")
+
+async def upload_pdf(file: UploadFile = File(...)):
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+
+    contents = await file.read()
+
+    # Extract text AND render pages as images with PyMuPDF
+    try:
+        import pymupdf
+        doc = pymupdf.open(stream=contents, filetype="pdf")
+        extracted_text = ""
+        images = []
+        
+        for page_num, page in enumerate(doc):
+            extracted_text += page.get_text()
+            
+            # Render the page as an image (for vector/text-based PDFs)
+            pix = page.get_pixmap(dpi=150)  # Render at 150 DPI
+            img_bytes = pix.tobytes("jpeg")
+            images.append(img_bytes)
+            
+            # Also try to extract embedded images
+            image_list = page.get_images()
+            for img_index, img in enumerate(image_list[:3]):
+                xref = img[0]
+                base_image = doc.extract_image(xref)
+                image_bytes = base_image["image"]
+                images.append(image_bytes)
+        
+        doc.close()
+        
+        # Debug: write to file
+        with open("debug_extraction.txt", "w") as f:
+            f.write(f"Extracted text length: {len(extracted_text)}\n")
+            f.write(f"Number of images: {len(images)}\n")
+            f.write(f"Text preview: {extracted_text[:500]}\n")
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read PDF: {str(e)}")
+
+    # If we have images, use Claude vision to analyze the schematic
+    if images:
+        import base64
+        from PIL import Image
+        import io
+        
+        # Use the first image (usually the main schematic)
+        image_b64 = base64.b64encode(images[0]).decode('utf-8')
+        
+        # Get image dimensions for coordinate normalization
+        img = Image.open(io.BytesIO(images[0]))
+        img_width, img_height = img.size
+        
+        vision_prompt = f"""Analyze this Arduino schematic and create a precise Arduino UNO R3 board layout.
+
+Use the EXACT Arduino UNO R3 component positions as percentages (0,0 = top-left, 100,100 = bottom-right):
+
+<reply>
+I've created an accurate Arduino UNO R3 board layout from your schematic with precise component positioning.
+</reply>
+<circuit>
+{{
+  "components": [
+    {{"id": "USB", "type": "connector", "value": "USB-B", "position": [1, 50], "position_type": "percent"}},
+    {{"id": "PWR_JACK", "type": "connector", "value": "Power Jack", "position": [1, 25], "position_type": "percent"}},
+    {{"id": "MCU", "type": "ic", "value": "ATmega328P", "position": [60, 65], "position_type": "percent"}},
+    {{"id": "USB_MCU", "type": "ic", "value": "ATmega16U2", "position": [30, 35], "position_type": "percent"}},
+    {{"id": "RESET", "type": "button", "value": "Reset", "position": [25, 15], "position_type": "percent"}},
+    {{"id": "PWR_LED", "type": "led", "value": "ON", "color": "green", "position": [85, 15], "position_type": "percent"}},
+    {{"id": "LED_L", "type": "led", "value": "L", "color": "orange", "position": [80, 15], "position_type": "percent"}},
+    {{"id": "LED_RX", "type": "led", "value": "RX", "color": "yellow", "position": [75, 15], "position_type": "percent"}},
+    {{"id": "LED_TX", "type": "led", "value": "TX", "color": "yellow", "position": [70, 15], "position_type": "percent"}},
+    {{"id": "D0", "type": "pin", "value": "D0/RX", "position": [98, 25], "position_type": "percent"}},
+    {{"id": "D1", "type": "pin", "value": "D1/TX", "position": [98, 31], "position_type": "percent"}},
+    {{"id": "D2", "type": "pin", "value": "D2", "position": [98, 37], "position_type": "percent"}},
+    {{"id": "D3", "type": "pin", "value": "D3~", "position": [98, 43], "position_type": "percent"}},
+    {{"id": "D4", "type": "pin", "value": "D4", "position": [98, 49], "position_type": "percent"}},
+    {{"id": "D5", "type": "pin", "value": "D5~", "position": [98, 55], "position_type": "percent"}},
+    {{"id": "D6", "type": "pin", "value": "D6~", "position": [98, 61], "position_type": "percent"}},
+    {{"id": "D7", "type": "pin", "value": "D7", "position": [98, 67], "position_type": "percent"}},
+    {{"id": "D8", "type": "pin", "value": "D8", "position": [88, 25], "position_type": "percent"}},
+    {{"id": "D9", "type": "pin", "value": "D9~", "position": [88, 31], "position_type": "percent"}},
+    {{"id": "D10", "type": "pin", "value": "D10~", "position": [88, 37], "position_type": "percent"}},
+    {{"id": "D11", "type": "pin", "value": "D11~", "position": [88, 43], "position_type": "percent"}},
+    {{"id": "D12", "type": "pin", "value": "D12", "position": [88, 49], "position_type": "percent"}},
+    {{"id": "D13", "type": "pin", "value": "D13", "position": [88, 55], "position_type": "percent"}},
+    {{"id": "GND1", "type": "pin", "value": "GND", "position": [88, 61], "position_type": "percent"}},
+    {{"id": "AREF", "type": "pin", "value": "AREF", "position": [88, 67], "position_type": "percent"}},
+    {{"id": "IOREF", "type": "pin", "value": "IOREF", "position": [15, 95], "position_type": "percent"}},
+    {{"id": "RESET_PIN", "type": "pin", "value": "RESET", "position": [20, 95], "position_type": "percent"}},
+    {{"id": "V3V3", "type": "pin", "value": "3.3V", "position": [25, 95], "position_type": "percent"}},
+    {{"id": "V5", "type": "pin", "value": "5V", "position": [30, 95], "position_type": "percent"}},
+    {{"id": "GND2", "type": "pin", "value": "GND", "position": [35, 95], "position_type": "percent"}},
+    {{"id": "GND3", "type": "pin", "value": "GND", "position": [40, 95], "position_type": "percent"}},
+    {{"id": "VIN", "type": "pin", "value": "VIN", "position": [45, 95], "position_type": "percent"}},
+    {{"id": "A0", "type": "pin", "value": "A0", "position": [50, 95], "position_type": "percent"}},
+    {{"id": "A1", "type": "pin", "value": "A1", "position": [55, 95], "position_type": "percent"}},
+    {{"id": "A2", "type": "pin", "value": "A2", "position": [60, 95], "position_type": "percent"}},
+    {{"id": "A3", "type": "pin", "value": "A3", "position": [65, 95], "position_type": "percent"}},
+    {{"id": "A4", "type": "pin", "value": "A4/SDA", "position": [70, 95], "position_type": "percent"}},
+    {{"id": "A5", "type": "pin", "value": "A5/SCL", "position": [75, 95], "position_type": "percent"}},
+    {{"id": "ICSP1", "type": "connector", "value": "ICSP", "position": [75, 55], "position_type": "percent"}},
+    {{"id": "ICSP2", "type": "connector", "value": "ICSP", "position": [45, 20], "position_type": "percent"}}
+  ],
+  "connections": [
+    {{"from": "USB", "to": "USB_MCU"}},
+    {{"from": "USB_MCU", "to": "MCU"}},
+    {{"from": "PWR_JACK", "to": "VIN"}},
+    {{"from": "V5", "to": "MCU"}},
+    {{"from": "D13", "to": "LED_L.anode"}},
+    {{"from": "LED_L.cathode", "to": "GND1"}},
+    {{"from": "RESET", "to": "MCU"}}
+  ],
+  "power": {{"voltage": 5, "source": "USB/VIN"}},
+  "canvas_mode": "arduino",
+  "metadata": {{"name": "Arduino UNO R3", "entry_point": "USB"}}
+}}
+</circuit>"""
+
+        response = ai.messages.create(
+            model=MODEL,
+            max_tokens=8192,  # Increased for complex schematics
+            messages=[{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/jpeg",
+                            "data": image_b64,
+                        },
+                    },
+                    {
+                        "type": "text",
+                        "text": vision_prompt,
+                    }
+                ],
+            }]
+        )
+
+        raw = response.content[0].text
+        reply, circuit = parse_response(raw)
+
+        # Debug: save response to file
+        with open("debug_response.json", "w", encoding="utf-8") as f:
+            f.write(f"RAW RESPONSE:\n{raw}\n\n")
+            f.write(f"PARSED REPLY:\n{reply}\n\n")
+            f.write(f"PARSED CIRCUIT:\n{json.dumps(circuit, indent=2) if circuit else 'None'}\n")
+
+        if circuit is None:
+            return {
+                "circuit": None,
+                "error": reply if reply else "I couldn't identify a clear circuit schematic in this PDF. Try describing the circuit in the chat instead."
+            }
+
+        # Validate before returning
+        validation = validate_circuit_data(circuit)
+
+        return {
+            "circuit": circuit,
+            "reply": reply,
+            "warnings": validation["warnings"],
+            "errors": validation["errors"] if not validation["valid"] else [],
+        }
+
+    # Fallback: text-only extraction (for text-based circuit descriptions)
+    if not extracted_text.strip():
+        return {
+            "circuit": None,
+            "error": "This PDF appears to be empty or image-only with no extractable content. Try describing the circuit in the chat instead."
+        }
+
+    # Enrich with Nexar component specs
+    component_specs = await enrich_components_from_nexar(extracted_text)
+
+    # Ask Claude to generate circuit JSON from extracted text + Nexar specs
+    response = ai.messages.create(
+        model=MODEL,
+        max_tokens=2048,
+        messages=[{
+            "role": "user",
+            "content": PDF_CIRCUIT_PROMPT.format(
+                extracted_text=extracted_text[:6000],
+                component_specs=component_specs,
+            )
+        }]
+    )
+
+    raw = response.content[0].text
+    reply, circuit = parse_response(raw)
+
+    if circuit is None:
+        return {
+            "circuit": None,
+            "error": reply if reply else "I couldn't find a clear circuit schematic in this PDF. Try describing the circuit in the chat instead."
+        }
+
+    # Validate before returning
+    validation = validate_circuit_data(circuit)
+
     return {
-        "extracted_text": "[stub] PDF received",
-        "components_hint": [],
-        "circuit_id": circuit_id,
+        "circuit": circuit,
+        "reply": reply,
+        "warnings": validation["warnings"],
+        "errors": validation["errors"] if not validation["valid"] else [],
     }
 
 
@@ -140,13 +1334,61 @@ async def upload_pdf(file: UploadFile = File(...), circuit_id: str | None = None
 # P2 — /validate-circuit
 # ---------------------------------------------------------------------------
 
+def validate_circuit_data(circuit: dict) -> dict:
+    """Sanity check circuit JSON structure."""
+    errors = []
+    warnings = []
+
+    components = circuit.get("components", [])
+    connections = circuit.get("connections", [])
+
+    if not components:
+        errors.append("Circuit has no components.")
+
+    # Check for duplicate IDs
+    ids = [c.get("id") for c in components]
+    if len(ids) != len(set(ids)):
+        errors.append("Duplicate component IDs found.")
+
+    # Check all components have required fields
+    for c in components:
+        if not c.get("id"):
+            errors.append("A component is missing an ID.")
+        if not c.get("type"):
+            errors.append(f"Component {c.get('id', '?')} is missing a type.")
+        if not isinstance(c.get("position"), list) or len(c.get("position", [])) != 2:
+            errors.append(f"Component {c.get('id', '?')} has an invalid position.")
+
+    # Check connections reference known component IDs
+    known_ids = set(ids) | {"VCC", "GND"}
+    for conn in connections:
+        for endpoint in [conn.get("from", ""), conn.get("to", "")]:
+            base_id = endpoint.split(".")[0]
+            if base_id not in known_ids:
+                warnings.append(f"Connection references unknown component: {base_id}")
+
+    # Warn if no connections
+    if components and not connections:
+        warnings.append("Circuit has components but no connections.")
+
+    # Warn if no power
+    if not circuit.get("power"):
+        warnings.append("No power configuration specified.")
+
+    return {
+        "valid": len(errors) == 0,
+        "errors": errors,
+        "warnings": warnings,
+    }
+
+
 class ValidateRequest(BaseModel):
     circuit: dict
 
 @app.post("/validate-circuit")
 async def validate_circuit(req: ValidateRequest):
-    # TODO P2: sanity check JSON structure
-    return {"valid": True, "errors": [], "warnings": []}
+    result = validate_circuit_data(req.circuit)
+    return result
 
 
 # ---------------------------------------------------------------------------

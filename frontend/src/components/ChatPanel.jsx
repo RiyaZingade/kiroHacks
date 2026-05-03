@@ -1,10 +1,17 @@
 import { useState, useRef, useEffect } from 'react'
 
 // P1 owns this file
-export default function ChatPanel({ circuit, setCircuit }) {
+export default function ChatPanel({ circuit, setCircuit, seedMessage }) {
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Hi! Describe a circuit and I\'ll build it, or ask me to modify the current one.' }
+    { role: 'assistant', content: 'Hi! Describe a circuit and I\'ll build it, or upload a schematic PDF above.' }
   ])
+
+  // Inject seeded message from PDF upload
+  useEffect(() => {
+    if (seedMessage) {
+      setMessages((m) => [...m, { role: 'assistant', content: seedMessage }])
+    }
+  }, [seedMessage])
   const [history, setHistory] = useState([])  // Claude-format history (no system messages)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
