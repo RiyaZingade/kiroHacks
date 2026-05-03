@@ -119,6 +119,36 @@ export function getPinPosition(component) {
   return result
 }
 
+// Resistor color band lookup
+const BAND_COLORS = ['#000', '#8B4513', '#f00', '#f90', '#ff0', '#0a0', '#00f', '#808', '#888', '#fff']
+// Multiplier bands: 1, 10, 100, 1k, 10k, 100k, 1M
+const MULT_COLORS = ['#000', '#8B4513', '#f00', '#f90', '#ff0', '#0a0', '#00f']
+const TOLERANCE_GOLD = '#DAA520'
+
+function getResistorBands(value) {
+  if (!value) return [BAND_COLORS[1], BAND_COLORS[0], BAND_COLORS[3], TOLERANCE_GOLD] // default 10kΩ
+  // Parse value string like "220", "10k", "4.7kΩ", "10kΩ"
+  const cleaned = value.replace(/[Ωω\s]/gi, '').toLowerCase()
+  let ohms = parseFloat(cleaned)
+  if (cleaned.endsWith('k')) ohms = parseFloat(cleaned) * 1000
+  else if (cleaned.endsWith('m')) ohms = parseFloat(cleaned) * 1000000
+  if (isNaN(ohms) || ohms <= 0) return [BAND_COLORS[1], BAND_COLORS[0], BAND_COLORS[3], TOLERANCE_GOLD]
+
+  // Normalize to 2 significant digits
+  let mult = 0
+  let sig = ohms
+  while (sig >= 100) { sig /= 10; mult++ }
+  while (sig < 10 && mult > 0) { sig *= 10; mult-- }
+  const d1 = Math.floor(sig / 10) % 10
+  const d2 = Math.round(sig) % 10
+  return [
+    BAND_COLORS[d1] || '#000',
+    BAND_COLORS[d2] || '#000',
+    MULT_COLORS[mult] || '#000',
+    TOLERANCE_GOLD,
+  ]
+}
+
 export default function ComponentRenderer({
   component,
   isSelected,
@@ -166,19 +196,51 @@ export default function ComponentRenderer({
 
     switch (component.type) {
       case 'led':
-        // Vertical 1×3: pins at top (0,0) and bottom (0, 2*CELL)
-        return (
-          <Ellipse
-            x={0}
-            y={CELL}
-            radiusX={halfCell - 2}
-            radiusY={CELL - 2}
-            fill={fillColor}
-            stroke={isSelected ? '#facc15' : '#ffffff20'}
-            strokeWidth={isSelected ? 2 : 1}
-            opacity={0.9}
-          />
-        )
+        // Vertical 1×3: dome-shaped LED with two pin legs
+        {
+          const ledColor = fillColor
+          const dimColor = fillColor + '60'
+          return (
+            <>
+              {/* Pin legs */}
+              <Line points={[-3, 0, -3, CELL * 0.4]} stroke="#9ca3af" strokeWidth={1.5} />
+              <Line points={[3, 0, 3, CELL * 0.4]} stroke="#9ca3af" strokeWidth={1.5} />
+              {/* Anode leg longer marker */}
+              <Line points={[-5, -2, -1, -2]} stroke="#9ca3af" strokeWidth={1} />
+              {/* Flat base */}
+              <Rect
+                x={-halfCell + 2}
+                y={CELL * 0.4}
+                width={CELL - 4}
+                height={4}
+                fill={ledColor}
+                opacity={0.8}
+              />
+              {/* LED dome body */}
+              <Circle
+                x={0}
+                y={CELL * 0.9}
+                radius={halfCell - 1}
+                fill={ledColor}
+                stroke={isSelected ? '#facc15' : '#ffffff30'}
+                strokeWidth={isSelected ? 2 : 1}
+                opacity={0.9}
+              />
+              {/* Inner glow highlight */}
+              <Circle
+                x={-2}
+                y={CELL * 0.75}
+                radius={3}
+                fill="#ffffff"
+                opacity={0.35}
+                listening={false}
+              />
+              {/* Cathode pin at bottom */}
+              <Line points={[-3, CELL * 1.5, -3, CELL * 2]} stroke="#9ca3af" strokeWidth={1.5} />
+              <Line points={[3, CELL * 1.5, 3, CELL * 2]} stroke="#9ca3af" strokeWidth={1.5} />
+            </>
+          )
+        }
       case 'capacitor':
         // Horizontal 3×1: two vertical parallel plates in the middle
         {
@@ -250,19 +312,45 @@ export default function ComponentRenderer({
           />
         )
       default:
-        // resistor: 3×1 body centered on pin row
-        return (
-          <Rect
-            x={0}
-            y={-halfCell}
-            width={3 * CELL}
-            height={CELL}
-            fill={fillColor}
-            stroke={isSelected ? '#facc15' : '#ffffff20'}
-            strokeWidth={isSelected ? 2 : 1}
-            cornerRadius={3}
-          />
-        )
+        // resistor: 3×1 body with color bands
+        {
+          const bands = getResistorBands(component.value)
+          const bodyW = 3 * CELL
+          const bodyH = CELL
+          const bandW = 4
+          const bandPositions = [0.2, 0.35, 0.5, 0.75] // relative positions along body
+          return (
+            <>
+              {/* Lead wires */}
+              <Line points={[0, 0, bodyW * 0.1, 0]} stroke="#9ca3af" strokeWidth={1.5} />
+              <Line points={[bodyW * 0.9, 0, bodyW, 0]} stroke="#9ca3af" strokeWidth={1.5} />
+              {/* Body */}
+              <Rect
+                x={bodyW * 0.1}
+                y={-halfCell}
+                width={bodyW * 0.8}
+                height={bodyH}
+                fill="#d2b48c"
+                stroke={isSelected ? '#facc15' : '#b8956a'}
+                strokeWidth={isSelected ? 2 : 1}
+                cornerRadius={3}
+              />
+              {/* Color bands */}
+              {bands.map((color, i) => (
+                <Rect
+                  key={i}
+                  x={bodyW * bandPositions[i] - bandW / 2}
+                  y={-halfCell + 2}
+                  width={bandW}
+                  height={bodyH - 4}
+                  fill={color}
+                  cornerRadius={1}
+                  listening={false}
+                />
+              ))}
+            </>
+          )
+        }
     }
   }
 

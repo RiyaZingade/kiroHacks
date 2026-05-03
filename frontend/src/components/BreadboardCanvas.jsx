@@ -39,7 +39,7 @@ function clampToGrid(col, row, type, rotation = 0) {
   return [clampedCol, clampedRow]
 }
 
-export default function BreadboardCanvas({ circuit, setCircuit, playing }) {
+export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCount, speed }) {
   const components = circuit?.components ?? []
   const connections = circuit?.connections ?? []
   const mode = circuit?.canvas_mode ?? 'agent'
@@ -257,16 +257,29 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing }) {
         <span className="text-sm font-semibold text-gray-400 uppercase tracking-wide">
           Canvas
         </span>
-        <button
-          onClick={toggleMode}
-          className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-            mode === 'agent'
-              ? 'bg-blue-600 text-white'
-              : 'bg-purple-600 text-white'
-          }`}
-        >
-          {mode === 'agent' ? '🤖 Agent Mode' : '✋ Manual Mode'}
-        </button>
+        <div className="relative flex bg-gray-800 rounded-full p-0.5 w-48">
+          <div
+            className={`absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] rounded-full transition-all duration-300 ease-in-out ${
+              mode === 'agent' ? 'left-0.5 bg-blue-600' : 'left-[calc(50%+2px)] bg-purple-600'
+            }`}
+          />
+          <button
+            onClick={() => mode !== 'agent' && toggleMode()}
+            className={`relative z-10 flex-1 py-1 text-xs font-medium text-center rounded-full transition-colors duration-300 ${
+              mode === 'agent' ? 'text-white' : 'text-gray-400'
+            }`}
+          >
+            Agent
+          </button>
+          <button
+            onClick={() => mode !== 'manual' && toggleMode()}
+            className={`relative z-10 flex-1 py-1 text-xs font-medium text-center rounded-full transition-colors duration-300 ${
+              mode === 'manual' ? 'text-white' : 'text-gray-400'
+            }`}
+          >
+            Manual
+          </button>
+        </div>
         {wiringFrom && (
           <span className="text-xs text-yellow-400 animate-pulse">
             Wiring: click a target pin (Esc to cancel)
@@ -445,7 +458,7 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing }) {
             </Layer>
 
             {/* P4: Current flow animation layer */}
-            <CurrentFlowAnimation components={components} connections={connections} playing={playing} canvasHeight={CANVAS_H} />
+            <CurrentFlowAnimation components={components} connections={connections} playing={playing} resetCount={resetCount} speed={speed} canvasHeight={CANVAS_H} />
           </Stage>
         </div>
 
@@ -453,6 +466,14 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing }) {
           <ComponentInspector
             component={selectedComponent}
             onUpdateValue={handleUpdateValue}
+            onUpdateColor={(id, color) => {
+              setCircuit((prev) => ({
+                ...prev,
+                components: prev.components.map((c) =>
+                  c.id === id ? { ...c, color } : c
+                ),
+              }))
+            }}
             onRotate={handleRotateComponent}
             onDelete={handleDeleteComponent}
             onClose={() => setSelectedComponentId(null)}

@@ -14,11 +14,12 @@ const EMPTY_CIRCUIT = {
 
 export default function App() {
   const [circuit, setCircuit] = useState(EMPTY_CIRCUIT)
+  const [chatExpanded, setChatExpanded] = useState(false)
 
   return (
     <>
-      <MainLayout circuit={circuit} setCircuit={setCircuit} />
-      <ChatWidget circuit={circuit} setCircuit={setCircuit} />
+      <MainLayout circuit={circuit} setCircuit={setCircuit} chatExpanded={chatExpanded} setChatExpanded={setChatExpanded} />
+      <ChatWidget circuit={circuit} setCircuit={setCircuit} expanded={chatExpanded} setExpanded={setChatExpanded} />
     </>
   )
 }

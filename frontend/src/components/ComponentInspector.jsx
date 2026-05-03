@@ -10,6 +10,7 @@ export default function ComponentInspector({
   onRotate,
   onDelete,
   onClose,
+  onUpdateColor,
 }) {
   const [value, setValue] = useState(component?.value ?? '')
   const ref = useRef(null)
@@ -105,6 +106,26 @@ export default function ComponentInspector({
             </button>
           </div>
         </div>
+
+        {/* LED Color (only for LEDs) */}
+        {component.type === 'led' && (
+          <div>
+            <label className="text-gray-500 text-xs uppercase tracking-wide">Color</label>
+            <div className="flex gap-2 mt-1 flex-wrap">
+              {['red', 'green', 'blue', 'yellow', 'white', 'orange', 'purple'].map((c) => (
+                <button
+                  key={c}
+                  onClick={() => onUpdateColor?.(component.id, c)}
+                  className={`w-7 h-7 rounded-full border-2 transition-transform ${
+                    component.color === c ? 'border-white scale-110' : 'border-gray-600 hover:border-gray-400'
+                  }`}
+                  style={{ backgroundColor: c }}
+                  title={c}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Position */}
         <div>

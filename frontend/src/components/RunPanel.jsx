@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react'
 import CodeEditor from './CodeEditor'
 import RunInstructions from './RunInstructions'
 
-export default function RunPanel({ circuit, onPlayingChange }) {
+export default function RunPanel({ circuit, onPlayingChange, onReset, onSpeedChange }) {
   const [code, setCode] = useState(circuit?.code?.source ?? '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [playing, setPlaying] = useState(false)
+  const [speed, setSpeed] = useState(1)
 
   const connections = circuit?.connections ?? []
   const hasConnections = connections.length > 0
@@ -51,30 +52,58 @@ export default function RunPanel({ circuit, onPlayingChange }) {
 
   function reset() {
     setPlaying(false)
-    onPlayingChange?.(false)
+    onReset?.()
   }
 
   return (
     <div className="flex flex-col h-full p-4 gap-4 overflow-y-auto">
       <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Run Panel</h2>
 
-      {/* Generate + Play Controls */}
+      {/* Play Controls */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {code && (
             <>
               <button
                 onClick={togglePlay}
-                className="text-xs bg-green-700 hover:bg-green-600 px-3 py-1.5 rounded cursor-pointer"
+                className={`w-9 h-9 flex items-center justify-center rounded-full transition-colors ${
+                  playing ? 'bg-yellow-600 hover:bg-yellow-500' : 'bg-green-600 hover:bg-green-500'
+                }`}
+                title={playing ? 'Pause' : 'Play'}
               >
-                {playing ? '⏸ Pause' : '▶ Play'}
+                {playing ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <rect x="6" y="4" width="4" height="16" rx="1" />
+                    <rect x="14" y="4" width="4" height="16" rx="1" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                    <polygon points="5,3 19,12 5,21" />
+                  </svg>
+                )}
               </button>
               <button
                 onClick={reset}
-                className="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded cursor-pointer"
+                className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-700 hover:bg-gray-600 transition-colors"
+                title="Reset"
               >
-                ↺ Reset
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M4 9a9 9 0 0115.36-5.36M20 15a9 9 0 01-15.36 5.36" />
+                </svg>
               </button>
+              <div className="flex items-center gap-1 ml-2 bg-gray-800 rounded-full px-2 py-1">
+                {[0.5, 1, 2, 3].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => { setSpeed(s); onSpeedChange?.(s) }}
+                    className={`px-2 py-0.5 text-[10px] font-medium rounded-full transition-colors ${
+                      speed === s ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    {s}x
+                  </button>
+                ))}
+              </div>
             </>
           )}
         </div>
