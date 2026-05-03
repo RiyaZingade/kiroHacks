@@ -1,12 +1,10 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
+import CodeMirror from '@uiw/react-codemirror'
+import { cpp } from '@codemirror/lang-cpp'
+import { vscodeDark } from '@uiw/codemirror-theme-vscode'
 
 export default function CodeEditor({ code, language, onCodeChange }) {
   const [copied, setCopied] = useState(false)
-  const textareaRef = useRef(null)
-  const lineNumRef = useRef(null)
-
-  const lines = (code || '').split('\n')
-  const lineCount = Math.max(lines.length, 1)
 
   function copyToClipboard() {
     if (!code) return
@@ -16,40 +14,31 @@ export default function CodeEditor({ code, language, onCodeChange }) {
     })
   }
 
-  function handleScroll() {
-    if (lineNumRef.current && textareaRef.current) {
-      lineNumRef.current.scrollTop = textareaRef.current.scrollTop
-    }
-  }
-
   return (
     <div className="relative h-full flex flex-col">
-      <div className="flex-1 min-h-0 flex bg-gray-900 rounded-lg border border-gray-800 overflow-hidden focus-within:ring-1 focus-within:ring-blue-500">
-        {/* Line numbers */}
-        <div
-          ref={lineNumRef}
-          className="py-3 pl-2 pr-1 text-right select-none overflow-hidden shrink-0 bg-gray-900"
-        >
-          {Array.from({ length: lineCount }, (_, i) => (
-            <div key={i} className="text-[10px] leading-5 text-gray-600 font-mono">{i + 1}</div>
-          ))}
-        </div>
-        {/* Editor */}
-        <textarea
-          ref={textareaRef}
-          value={code}
-          onChange={(e) => onCodeChange?.(e.target.value)}
-          onScroll={handleScroll}
+      <div className="flex-1 min-h-0 rounded-lg border border-gray-800 overflow-hidden">
+        <CodeMirror
+          value={code || ''}
+          onChange={(val) => onCodeChange?.(val)}
+          theme={vscodeDark}
+          extensions={[cpp()]}
           placeholder="Paste or type code here…"
-          className="flex-1 bg-transparent py-3 px-2 text-xs text-green-400 font-mono leading-5 resize-none outline-none"
-          spellCheck={false}
+          height="100%"
+          style={{ height: '100%', fontSize: '12px' }}
+          basicSetup={{
+            lineNumbers: true,
+            foldGutter: false,
+            highlightActiveLine: true,
+            bracketMatching: true,
+            autocompletion: false,
+          }}
         />
       </div>
       {/* Copy icon */}
       {code && (
         <button
           onClick={copyToClipboard}
-          className="absolute top-2 right-2 p-1.5 rounded-md bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors z-10"
+          className="absolute top-2 right-2 p-1.5 rounded-md bg-gray-800/80 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors z-10"
           title="Copy to clipboard"
         >
           {copied ? (

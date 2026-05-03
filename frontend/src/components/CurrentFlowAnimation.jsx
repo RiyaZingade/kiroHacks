@@ -132,6 +132,17 @@ export default function CurrentFlowAnimation({ components, connections, playing,
   // Start / stop
   useEffect(() => {
     if (playing && wires.length > 0) {
+      // Re-initialize dot state if it was cleared by reset
+      if (dotStateRef.current.length === 0) {
+        wires.forEach((wire, wireIdx) => {
+          for (let d = 0; d < DOTS_PER_WIRE; d++) {
+            dotStateRef.current.push({
+              wireIdx,
+              distance: wire.totalLen * DOT_SPACING * d,
+            })
+          }
+        })
+      }
       lastTimeRef.current = null
       animRef.current = requestAnimationFrame(animate)
     } else {
