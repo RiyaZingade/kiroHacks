@@ -13,8 +13,8 @@ const CloseIcon = () => (
   </svg>
 )
 
-export default function ChatWidget({ circuit, setCircuit, expanded, setExpanded }) {
-  const [open, setOpen] = useState(false)
+export default function ChatWidget({ circuit, setCircuit, expanded, setExpanded, initialOpen = false }) {
+  const [open, setOpen] = useState(initialOpen)
 
   if (expanded) return null
 
