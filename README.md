@@ -1,6 +1,6 @@
 # CirKit
 
-AI-powered electronics prototyping tool. 12-hour hackathon build.
+AI-powered electronics prototyping tool. 12-hour Kiro Hacks build.
 
 ---
 
@@ -27,7 +27,7 @@ python3.12 -m venv .venv        # must be Python 3.12 — PyMuPDF has no 3.13/3.
 source .venv/bin/activate       # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
-cp .env.example .env            # then paste your OpenAI key into .env
+cp .env.example .env            # then paste your Anthropic key into .env
 uvicorn main:app --reload
 # runs on http://localhost:8000
 ```
