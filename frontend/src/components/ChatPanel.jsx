@@ -1,18 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
 
-// P1 owns this file
-export default function ChatPanel({ circuit, setCircuit, seedMessage }) {
-  const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Hi! Describe a circuit and I\'ll build it, or upload a schematic PDF above.' }
-  ])
+const WELCOME = { role: 'assistant', content: 'Hi! Describe a circuit and I\'ll build it, or ask me to modify the current one.' }
 
-  // Inject seeded message from PDF upload
-  useEffect(() => {
-    if (seedMessage) {
-      setMessages((m) => [...m, { role: 'assistant', content: seedMessage }])
-    }
-  }, [seedMessage])
-  const [history, setHistory] = useState([])  // Claude-format history (no system messages)
+export default function ChatPanel({ circuit, setCircuit, projectId }) {
+  const [messages, setMessages] = useState([WELCOME])
+  const [history, setHistory] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [contextWarning, setContextWarning] = useState(false)
@@ -22,41 +15,63 @@ export default function ChatPanel({ circuit, setCircuit, seedMessage }) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // Load messages when project changes
+  useEffect(() => {
+    if (!projectId) { setMessages([WELCOME]); setHistory([]); return }
+    loadMessages(projectId)
+  }, [projectId])
+
+  async function loadMessages(pid) {
+    const { data } = await supabase
+      .from('chat_messages')
+      .select('role, content')
+      .eq('project_id', pid)
+      .order('created_at', { ascending: true })
+    if (data && data.length > 0) {
+      setMessages([WELCOME, ...data])
+      setHistory(data)
+    } else {
+      setMessages([WELCOME])
+      setHistory([])
+    }
+  }
+
+  async function saveMessage(role, content) {
+    if (!projectId) return
+    await supabase.from('chat_messages').insert({ project_id: projectId, role, content })
+  }
+
+  async function saveCircuit(circuitData) {
+    if (!projectId) return
+    await supabase.from('projects').update({ circuit: circuitData }).eq('id', projectId)
+  }
+
   async function send() {
     if (!input.trim() || loading) return
     const userText = input.trim()
     setInput('')
-    setMessages((m) => [...m, { role: 'user', content: userText }])
+    setMessages(m => [...m, { role: 'user', content: userText }])
     setLoading(true)
+    await saveMessage('user', userText)
 
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: userText,
-          circuit: circuit,
-          history: history,
-        }),
+        body: JSON.stringify({ message: userText, circuit, history }),
       })
       const data = await res.json()
-
-      // Update chat display
-      setMessages((m) => [...m, { role: 'assistant', content: data.reply }])
-
-      // Update conversation history for next turn
-      setHistory((h) => [
-        ...h,
-        { role: 'user', content: userText },
-        { role: 'assistant', content: data.reply },
-      ])
-
-      // Update canvas if circuit changed
-      if (data.updated_circuit) setCircuit(data.updated_circuit)
-
+      console.log('Chat response:', data)
+      setMessages(m => [...m, { role: 'assistant', content: data.reply }])
+      setHistory(h => [...h, { role: 'user', content: userText }, { role: 'assistant', content: data.reply }])
+      await saveMessage('assistant', data.reply)
+      if (data.updated_circuit) {
+        setCircuit(data.updated_circuit)
+        await saveCircuit(data.updated_circuit)
+      }
       setContextWarning(data.context_warning)
     } catch {
-      setMessages((m) => [...m, { role: 'assistant', content: '⚠ Could not reach the backend.' }])
+      setMessages(m => [...m, { role: 'assistant', content: '⚠ Could not reach the backend.' }])
     } finally {
       setLoading(false)
     }
@@ -64,20 +79,13 @@ export default function ChatPanel({ circuit, setCircuit, seedMessage }) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-        <span className="text-sm font-semibold text-gray-300">CirKit Agent</span>
-        {contextWarning && (
-          <span className="text-xs bg-yellow-900 text-yellow-300 px-2 py-1 rounded">
-            Context getting long — accuracy may drop
-          </span>
-        )}
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
+      <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`text-sm px-3 py-2 rounded-lg max-w-[85%] whitespace-pre-wrap ${
-              m.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-100'
+            <div className={`relative text-sm px-4 py-2.5 max-w-[80%] whitespace-pre-wrap ${
+              m.role === 'user'
+                ? 'bg-blue-600 text-white rounded-2xl rounded-br-md'
+                : 'bg-gray-800 text-gray-100 rounded-2xl rounded-bl-md'
             }`}>
               {m.content}
             </div>
@@ -85,7 +93,7 @@ export default function ChatPanel({ circuit, setCircuit, seedMessage }) {
         ))}
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-gray-800 text-gray-400 text-sm px-3 py-2 rounded-lg">Thinking…</div>
+            <div className="bg-gray-800 text-gray-400 text-sm px-4 py-2.5 rounded-2xl rounded-bl-md">Computing…</div>
           </div>
         )}
         <div ref={bottomRef} />

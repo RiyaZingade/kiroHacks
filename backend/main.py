@@ -335,7 +335,7 @@ SYSTEM_PROMPT = """You are CirKit, an AI circuit design assistant.
 When the user asks you to build or modify a circuit, you MUST respond in this exact format:
 
 <reply>
-Your plain English explanation here.
+Your plain English explanation here. Keep it to 2-3 sentences max.
 </reply>
 <circuit>
 { ...valid circuit JSON here... }
@@ -344,7 +344,7 @@ Your plain English explanation here.
 The circuit JSON must follow this schema exactly:
 {
   "components": [{ "id": "R1", "type": "resistor|led|capacitor|button|wire|power_rail", "value": "optional", "color": "optional", "position": [col, row] }],
-  "connections": [{ "from": "VCC|GND|<id>.pin1|<id>.anode|etc", "to": "<id>.pin1|etc" }],
+  "connections": [{ "from": "VCC|GND|<id>.pin1|<id>.pin2|<id>.anode|<id>.cathode", "to": "..." }],
   "power": { "voltage": 5, "source": "VCC" },
   "code": { "language": "arduino", "source": "", "origin": "agent" },
   "run_instructions": { "power_requirements": "", "wiring_steps": [], "software_setup": "", "safety_flags": [] },
@@ -352,11 +352,16 @@ The circuit JSON must follow this schema exactly:
   "metadata": { "name": "circuit name", "entry_point": "B" }
 }
 
-Rules:
-- positions are [col, row] integers on a 40x30 grid, space components at least 2 apart
-- always include VCC and GND connections
-- always add a current-limiting resistor before any LED
-- if the user asks a general question with no circuit change, omit the <circuit> block and just use <reply>
+STRICT RULES:
+- ONLY use these 6 component types: resistor, led, capacitor, button, wire, power_rail. No arduino, no buzzer, no potentiometer, no sensor, no IC.
+- Use VCC and GND directly in connections for power — do NOT create power_rail components.
+- Positions are [col, row] integers on a 40x30 grid, space components at least 3 apart.
+- Always include VCC and GND connections.
+- Always add a current-limiting resistor before any LED.
+- Keep circuits simple — max 8 components.
+- Keep the reply SHORT. The circuit JSON is what matters.
+- Do NOT include code in the circuit JSON. Leave code.source as empty string.
+- If the user asks a general question with no circuit change, omit the <circuit> block and just use <reply>.
 """
 
 def parse_response(text):
@@ -367,33 +372,45 @@ def parse_response(text):
         text = str(text)
     
     reply_match = re.search(r"<reply>(.*?)</reply>", text, re.DOTALL)
+    # Try closed tag first, then open-ended (truncated response)
     circuit_match = re.search(r"<circuit>(.*?)</circuit>", text, re.DOTALL)
+    if not circuit_match:
+        circuit_match = re.search(r"<circuit>(.*)", text, re.DOTALL)
 
     reply = reply_match.group(1).strip() if reply_match else text.strip()
     circuit = None
     if circuit_match:
+        raw_json = circuit_match.group(1).strip()
+        # Strip markdown fences if Claude wrapped them
+        raw_json = re.sub(r"^```(?:json)?\s*", "", raw_json)
+        raw_json = re.sub(r"\s*```$", "", raw_json)
         try:
-            circuit_json = circuit_match.group(1).strip()
-            # Try to parse, but if it fails due to truncation, try to fix common issues
-            circuit = json.loads(circuit_json)
-        except json.JSONDecodeError as e:
-            print(f"JSON decode error: {e}")
-            # JSON might be truncated - try to salvage what we can
-            try:
-                # Find the last complete object/array and truncate there
-                last_complete = circuit_json.rfind('}')
-                if last_complete > 0:
-                    circuit = json.loads(circuit_json[:last_complete+1])
-            except Exception as e2:
-                print(f"Failed to salvage JSON: {e2}")
-                pass
+            circuit = json.loads(raw_json)
+        except json.JSONDecodeError:
+            # Try to fix truncated JSON by finding the last complete object
+            # Find the outermost { and try to close it
+            brace_count = 0
+            last_valid = -1
+            for i, ch in enumerate(raw_json):
+                if ch == '{': brace_count += 1
+                elif ch == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        last_valid = i
+                        break
+            if last_valid > 0:
+                try:
+                    circuit = json.loads(raw_json[:last_valid + 1])
+                except json.JSONDecodeError:
+                    pass
+
     return reply, circuit
 
 app = FastAPI(title="CirKit API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -433,7 +450,7 @@ async def chat(req: ChatRequest):
     for attempt in range(3):
         response = ai.messages.create(
             model=MODEL,
-            max_tokens=2048,
+            max_tokens=4096,
             system=SYSTEM_PROMPT,
             messages=messages,
         )
@@ -1310,19 +1327,26 @@ async def validate_circuit(req: ValidateRequest):
 # ---------------------------------------------------------------------------
 
 class CodeRequest(BaseModel):
-    circuit_id: str | None = None
+    circuit: dict
     language: str = "arduino"
 
 @app.post("/generate-code")
 async def generate_code(req: CodeRequest):
-    # TODO P4: pass full circuit JSON in prompt
+    components = req.circuit.get("components", [])
+    connections = req.circuit.get("connections", [])
+    if not components and not connections:
+        raise HTTPException(status_code=400, detail="Circuit has no components or connections")
+
+    circuit_str = json.dumps(req.circuit, indent=2)
+
     response = ai.messages.create(
-        model="claude-opus-4-5",
+        model=MODEL,
         max_tokens=2048,
-        system=f"Generate {req.language} code for the given circuit. Return only code, no explanation.",
-        messages=[
-            {"role": "user", "content": f"circuit_id: {req.circuit_id}"},
-        ],
+        system=(
+            f"You are an electronics code generator. Given a circuit JSON, produce {req.language} code "
+            "that would run on real hardware. Return ONLY the code — no markdown fences, no explanation."
+        ),
+        messages=[{"role": "user", "content": f"Generate {req.language} code for this circuit:\n\n{circuit_str}"}],
     )
     return {
         "code": response.content[0].text,
