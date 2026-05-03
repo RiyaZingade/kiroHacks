@@ -302,9 +302,12 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
               setSelectedWireIdx(null)
               setWiringFrom(null)
             }}
-            className="px-3 py-1 rounded text-xs font-medium bg-red-900/50 hover:bg-red-800/60 border border-red-800 text-red-300 transition-colors"
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-800 hover:bg-red-900/60 text-gray-400 hover:text-red-400 transition-colors"
+            title="Clear board"
           >
-            🗑 Reset Board
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V4a1 1 0 011-1h6a1 1 0 011 1v3" />
+            </svg>
           </button>
         </div>
       </div>

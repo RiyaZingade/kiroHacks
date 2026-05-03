@@ -38,7 +38,7 @@ export default function MainLayout({ circuit, setCircuit, chatExpanded, setChatE
         <BreadboardCanvas circuit={circuit} setCircuit={setCircuit} playing={playing} resetCount={resetCount} speed={speed} />
       </div>
       <div className={`${chatExpanded ? 'w-[25%]' : 'w-[35%]'}`}>
-        <RunPanel circuit={circuit} onPlayingChange={setPlaying} onReset={handleReset} onSpeedChange={setSpeed} />
+        <RunPanel circuit={circuit} onPlayingChange={setPlaying} onReset={handleReset} onSpeedChange={setSpeed} setCircuit={setCircuit} />
       </div>
     </div>
   )
