@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
 
 const WELCOME = { role: 'assistant', content: 'Hi! Describe a circuit and I\'ll build it, or ask me to modify the current one.' }
 
-export default function ChatPanel({ circuit, setCircuit }) {
+export default function ChatPanel({ circuit, setCircuit, projectId }) {
   const [messages, setMessages] = useState([WELCOME])
   const [history, setHistory] = useState([])
   const [input, setInput] = useState('')
@@ -14,12 +15,44 @@ export default function ChatPanel({ circuit, setCircuit }) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // Load messages when project changes
+  useEffect(() => {
+    if (!projectId) { setMessages([WELCOME]); setHistory([]); return }
+    loadMessages(projectId)
+  }, [projectId])
+
+  async function loadMessages(pid) {
+    const { data } = await supabase
+      .from('chat_messages')
+      .select('role, content')
+      .eq('project_id', pid)
+      .order('created_at', { ascending: true })
+    if (data && data.length > 0) {
+      setMessages([WELCOME, ...data])
+      setHistory(data)
+    } else {
+      setMessages([WELCOME])
+      setHistory([])
+    }
+  }
+
+  async function saveMessage(role, content) {
+    if (!projectId) return
+    await supabase.from('chat_messages').insert({ project_id: projectId, role, content })
+  }
+
+  async function saveCircuit(circuitData) {
+    if (!projectId) return
+    await supabase.from('projects').update({ circuit: circuitData }).eq('id', projectId)
+  }
+
   async function send() {
     if (!input.trim() || loading) return
     const userText = input.trim()
     setInput('')
     setMessages(m => [...m, { role: 'user', content: userText }])
     setLoading(true)
+    await saveMessage('user', userText)
 
     try {
       const res = await fetch('/api/chat', {
@@ -31,7 +64,11 @@ export default function ChatPanel({ circuit, setCircuit }) {
       console.log('Chat response:', data)
       setMessages(m => [...m, { role: 'assistant', content: data.reply }])
       setHistory(h => [...h, { role: 'user', content: userText }, { role: 'assistant', content: data.reply }])
-      if (data.updated_circuit) setCircuit(data.updated_circuit)
+      await saveMessage('assistant', data.reply)
+      if (data.updated_circuit) {
+        setCircuit(data.updated_circuit)
+        await saveCircuit(data.updated_circuit)
+      }
       setContextWarning(data.context_warning)
     } catch {
       setMessages(m => [...m, { role: 'assistant', content: '⚠ Could not reach the backend.' }])
