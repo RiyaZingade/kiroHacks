@@ -1,5 +1,7 @@
 # How We Used Kiro to Build CirKit
 
+🚀 **Live App**: [cirkitkirohacks.vercel.app/app](https://cirkitkirohacks.vercel.app/app) · 📐 **[System Design](SYSTEM_DESIGN.md)**
+
 ## The Challenge
 
 Build an AI-powered electronics prototyping tool in 12 hours with a team of 4. The app needed to let users design circuits through natural language, visualize them on an interactive breadboard, animate current flow, generate runnable Arduino code, and persist everything to a database. That's a full-stack product with AI integration, real-time canvas rendering, and multiple entry points — in half a day.
@@ -114,3 +116,17 @@ We didn't build CirKit *with* Kiro. We built it *through* Kiro — from the firs
 - **1 custom agent** with file-scoped permissions and build hooks
 - **12 hours** from empty repo to deployed product
 - **0 broken builds** shipped to teammates (hooks caught every compile error)
+
+---
+
+## Deployed
+
+The final product is live and fully functional:
+
+| Layer | Service | URL |
+|-------|---------|-----|
+| Frontend | Vercel | [cirkitkirohacks.vercel.app](https://cirkitkirohacks.vercel.app) |
+| Backend | Render | [kirohacks.onrender.com](https://kirohacks.onrender.com) |
+| Database | Supabase | Hosted Postgres |
+
+Kiro generated the deployment spec, `vercel.json` rewrites, `render.yaml` config, and CORS configuration — the entire deployment pipeline was spec-driven, just like the code.

@@ -2,6 +2,10 @@
 
 AI-powered electronics prototyping tool. 12-hour Kiro Hacks build.
 
+🚀 **Live App**: [cirkitkirohacks.vercel.app/app](https://cirkitkirohacks.vercel.app/app)
+
+📐 **[System Design Diagram](SYSTEM_DESIGN.md)** · 🛠 **[How We Used Kiro](KIRO_WRITEUP.md)**
+
 ---
 
 ## Setup (do this first)
@@ -31,6 +35,18 @@ cp .env.example .env            # then paste your Anthropic key into .env
 uvicorn main:app --reload
 # runs on http://localhost:8000
 ```
+
+---
+
+## Deployment
+
+| Layer | Service | URL |
+|-------|---------|-----|
+| Frontend | Vercel | [cirkitkirohacks.vercel.app](https://cirkitkirohacks.vercel.app) |
+| Backend | Render | [kirohacks.onrender.com](https://kirohacks.onrender.com) |
+| Database | Supabase | Hosted Postgres |
+
+See [deployment spec](.kiro/specs/deployment/deployment.md) for full setup instructions.
 
 ---
 
