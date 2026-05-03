@@ -42,6 +42,11 @@ export default function RunPanel({ circuit, onPlayingChange, onReset, onSpeedCha
       }
       const data = await res.json()
       setCode(data.code)
+      // Save code into circuit so it persists with the project
+      setCircuit?.(prev => ({
+        ...prev,
+        code: { ...prev.code, source: data.code, language: data.language || 'arduino' }
+      }))
     } catch (e) {
       setError(e.message)
     } finally {

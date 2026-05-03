@@ -30,12 +30,20 @@ export default function App() {
     canvas_mode: params.mode === 'manual' ? 'manual' : 'agent',
   }))
   const [chatExpanded, setChatExpanded] = useState(false)
+  const [projectId, setProjectId] = useState(null)
 
   if (path === '/app') {
     return (
       <>
-        <MainLayout circuit={circuit} setCircuit={setCircuit} chatExpanded={chatExpanded} setChatExpanded={setChatExpanded} />
-        <ChatWidget circuit={circuit} setCircuit={setCircuit} expanded={chatExpanded} setExpanded={setChatExpanded} initialOpen={params.chatOpen} />
+        <MainLayout
+          circuit={circuit}
+          setCircuit={setCircuit}
+          chatExpanded={chatExpanded}
+          setChatExpanded={setChatExpanded}
+          projectId={projectId}
+          setProjectId={setProjectId}
+        />
+        <ChatWidget circuit={circuit} setCircuit={setCircuit} expanded={chatExpanded} setExpanded={setChatExpanded} initialOpen={params.chatOpen} projectId={projectId} />
       </>
     )
   }
