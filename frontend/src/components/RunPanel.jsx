@@ -31,7 +31,7 @@ export default function RunPanel({ circuit, onPlayingChange, onReset, onSpeedCha
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('http://localhost:8000/generate-code', {
+      const res = await fetch('/api/generate-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ circuit, language: 'arduino' })
