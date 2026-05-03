@@ -1,0 +1,226 @@
+RAW RESPONSE:
+<reply>
+This is an Arduino Nano v3.3 schematic. I can see the board name "NanoV3.3" in the bottom right corner. The schematic shows the characteristic Arduino Nano layout with pins along both long edges, a mini-USB connector, the ATmega328P microcontroller, FT232RL USB-to-serial chip, voltage regulator, crystal oscillator, and various support components like LEDs, resistors, and capacitors.
+</reply>
+
+<circuit>
+{
+  "components": [
+    {"id": "U3", "type": "ic", "value": "ATmega328P", "position": [50, 50], "position_type": "percent"},
+    {"id": "U1", "type": "ic", "value": "FT232RL", "position": [70, 50], "position_type": "percent"},
+    {"id": "U2", "type": "ic", "value": "AMS1117", "position": [25, 65], "position_type": "percent"},
+    {"id": "USB1", "type": "connector", "value": "USB Mini", "position": [75, 30], "position_type": "percent"},
+    {"id": "ICSP1", "type": "connector", "value": "ICSP", "position": [65, 75], "position_type": "percent"},
+    {"id": "X1", "type": "crystal", "value": "16MHz", "position": [45, 65], "position_type": "percent"},
+    {"id": "LED1", "type": "led", "value": "Power LED", "position": [80, 45], "position_type": "percent"},
+    {"id": "LED2", "type": "led", "value": "Pin 13 LED", "position": [55, 35], "position_type": "percent"},
+    {"id": "SW1", "type": "button", "value": "Reset", "position": [35, 45], "position_type": "percent"},
+    {"id": "J1", "type": "connector", "value": "Digital Pins", "position": [15, 40], "position_type": "percent"},
+    {"id": "J2", "type": "connector", "value": "Analog Pins", "position": [85, 60], "position_type": "percent"},
+    {"id": "R1", "type": "resistor", "value": "1k", "position": [52, 40], "position_type": "percent"},
+    {"id": "R2", "type": "resistor", "value": "1k", "position": [77, 42], "position_type": "percent"},
+    {"id": "C1", "type": "capacitor", "value": "100nF", "position": [42, 70], "position_type": "percent"},
+    {"id": "C2", "type": "capacitor", "value": "100nF", "position": [48, 70], "position_type": "percent"},
+    {"id": "C3", "type": "capacitor", "value": "22pF", "position": [43, 62], "position_type": "percent"},
+    {"id": "C4", "type": "capacitor", "value": "22pF", "position": [47, 62], "position_type": "percent"}
+  ],
+  "connections": [],
+  "power": {"voltage": 5, "source": "USB"},
+  "canvas_mode": "agent",
+  "metadata": {
+    "name": "Arduino Nano v3.3",
+    "board_type": "nano",
+    "entry_point": "USB"
+  }
+}
+</circuit>
+
+PARSED REPLY:
+This is an Arduino Nano v3.3 schematic. I can see the board name "NanoV3.3" in the bottom right corner. The schematic shows the characteristic Arduino Nano layout with pins along both long edges, a mini-USB connector, the ATmega328P microcontroller, FT232RL USB-to-serial chip, voltage regulator, crystal oscillator, and various support components like LEDs, resistors, and capacitors.
+
+PARSED CIRCUIT:
+{
+  "components": [
+    {
+      "id": "U3",
+      "type": "ic",
+      "value": "ATmega328P",
+      "position": [
+        50,
+        50
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "U1",
+      "type": "ic",
+      "value": "FT232RL",
+      "position": [
+        70,
+        50
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "U2",
+      "type": "ic",
+      "value": "AMS1117",
+      "position": [
+        25,
+        65
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "USB1",
+      "type": "connector",
+      "value": "USB Mini",
+      "position": [
+        75,
+        30
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "ICSP1",
+      "type": "connector",
+      "value": "ICSP",
+      "position": [
+        65,
+        75
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "X1",
+      "type": "crystal",
+      "value": "16MHz",
+      "position": [
+        45,
+        65
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "LED1",
+      "type": "led",
+      "value": "Power LED",
+      "position": [
+        80,
+        45
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "LED2",
+      "type": "led",
+      "value": "Pin 13 LED",
+      "position": [
+        55,
+        35
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "SW1",
+      "type": "button",
+      "value": "Reset",
+      "position": [
+        35,
+        45
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "J1",
+      "type": "connector",
+      "value": "Digital Pins",
+      "position": [
+        15,
+        40
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "J2",
+      "type": "connector",
+      "value": "Analog Pins",
+      "position": [
+        85,
+        60
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "R1",
+      "type": "resistor",
+      "value": "1k",
+      "position": [
+        52,
+        40
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "R2",
+      "type": "resistor",
+      "value": "1k",
+      "position": [
+        77,
+        42
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "C1",
+      "type": "capacitor",
+      "value": "100nF",
+      "position": [
+        42,
+        70
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "C2",
+      "type": "capacitor",
+      "value": "100nF",
+      "position": [
+        48,
+        70
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "C3",
+      "type": "capacitor",
+      "value": "22pF",
+      "position": [
+        43,
+        62
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "C4",
+      "type": "capacitor",
+      "value": "22pF",
+      "position": [
+        47,
+        62
+      ],
+      "position_type": "percent"
+    }
+  ],
+  "connections": [],
+  "power": {
+    "voltage": 5,
+    "source": "USB"
+  },
+  "canvas_mode": "agent",
+  "metadata": {
+    "name": "Arduino Nano v3.3",
+    "board_type": "nano",
+    "entry_point": "USB"
+  }
+}

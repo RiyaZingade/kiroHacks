@@ -1,0 +1,52 @@
+{
+  "components": [
+    {"id": "USB", "type": "connector", "value": "USB-B", "position": [1, 50], "position_type": "percent"},
+    {"id": "PWR_JACK", "type": "connector", "value": "Power Jack", "position": [1, 25], "position_type": "percent"},
+    {"id": "MCU", "type": "ic", "value": "ATmega328P", "position": [60, 65], "position_type": "percent"},
+    {"id": "USB_MCU", "type": "ic", "value": "ATmega16U2", "position": [30, 35], "position_type": "percent"},
+    {"id": "RESET", "type": "button", "value": "Reset", "position": [25, 15], "position_type": "percent"},
+    {"id": "PWR_LED", "type": "led", "value": "ON", "color": "green", "position": [85, 15], "position_type": "percent"},
+    {"id": "LED_L", "type": "led", "value": "L", "color": "orange", "position": [80, 15], "position_type": "percent"},
+    
+    {"id": "D0", "type": "pin", "value": "D0/RX", "position": [98, 25], "position_type": "percent"},
+    {"id": "D1", "type": "pin", "value": "D1/TX", "position": [98, 31], "position_type": "percent"},
+    {"id": "D2", "type": "pin", "value": "D2", "position": [98, 37], "position_type": "percent"},
+    {"id": "D3", "type": "pin", "value": "D3~", "position": [98, 43], "position_type": "percent"},
+    {"id": "D4", "type": "pin", "value": "D4", "position": [98, 49], "position_type": "percent"},
+    {"id": "D5", "type": "pin", "value": "D5~", "position": [98, 55], "position_type": "percent"},
+    {"id": "D6", "type": "pin", "value": "D6~", "position": [98, 61], "position_type": "percent"},
+    {"id": "D7", "type": "pin", "value": "D7", "position": [98, 67], "position_type": "percent"},
+    
+    {"id": "D8", "type": "pin", "value": "D8", "position": [88, 25], "position_type": "percent"},
+    {"id": "D9", "type": "pin", "value": "D9~", "position": [88, 31], "position_type": "percent"},
+    {"id": "D10", "type": "pin", "value": "D10~", "position": [88, 37], "position_type": "percent"},
+    {"id": "D11", "type": "pin", "value": "D11~", "position": [88, 43], "position_type": "percent"},
+    {"id": "D12", "type": "pin", "value": "D12", "position": [88, 49], "position_type": "percent"},
+    {"id": "D13", "type": "pin", "value": "D13", "position": [88, 55], "position_type": "percent"},
+    {"id": "GND1", "type": "pin", "value": "GND", "position": [88, 61], "position_type": "percent"},
+    {"id": "AREF", "type": "pin", "value": "AREF", "position": [88, 67], "position_type": "percent"},
+    
+    {"id": "IOREF", "type": "pin", "value": "IOREF", "position": [15, 95], "position_type": "percent"},
+    {"id": "RESET_PIN", "type": "pin", "value": "RESET", "position": [20, 95], "position_type": "percent"},
+    {"id": "V3V3", "type": "pin", "value": "3.3V", "position": [25, 95], "position_type": "percent"},
+    {"id": "V5", "type": "pin", "value": "5V", "position": [30, 95], "position_type": "percent"},
+    {"id": "GND2", "type": "pin", "value": "GND", "position": [35, 95], "position_type": "percent"},
+    {"id": "GND3", "type": "pin", "value": "GND", "position": [40, 95], "position_type": "percent"},
+    {"id": "VIN", "type": "pin", "value": "VIN", "position": [45, 95], "position_type": "percent"},
+    
+    {"id": "A0", "type": "pin", "value": "A0", "position": [50, 95], "position_type": "percent"},
+    {"id": "A1", "type": "pin", "value": "A1", "position": [55, 95], "position_type": "percent"},
+    {"id": "A2", "type": "pin", "value": "A2", "position": [60, 95], "position_type": "percent"},
+    {"id": "A3", "type": "pin", "value": "A3", "position": [65, 95], "position_type": "percent"},
+    {"id": "A4", "type": "pin", "value": "A4/SDA", "position": [70, 95], "position_type": "percent"},
+    {"id": "A5", "type": "pin", "value": "A5/SCL", "position": [75, 95], "position_type": "percent"}
+  ],
+  "connections": [
+    {"from": "USB", "to": "USB_MCU"},
+    {"from": "USB_MCU", "to": "MCU"},
+    {"from": "PWR_JACK", "to": "VIN"}
+  ],
+  "power": {"voltage": 5, "source": "USB/VIN"},
+  "canvas_mode": "arduino",
+  "metadata": {"name": "Arduino UNO R3 Test", "entry_point": "USB"}
+}
