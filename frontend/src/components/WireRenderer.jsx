@@ -36,6 +36,7 @@ export default function WireRenderer({
   selectedWireIdx,
   onWireClick,
   canvasHeight = 600,
+  brokenIndices = new Set(),
 }) {
   return (
     <>
@@ -46,6 +47,7 @@ export default function WireRenderer({
         if (!from || !to) return null
 
         const isSelected = selectedWireIdx === idx
+        const isBroken = brokenIndices?.has(idx) && selectedWireIdx !== idx
 
         // Right-angle routing: go horizontal to midpoint, then vertical, then horizontal
         const midX = (from.x + to.x) / 2
@@ -56,12 +58,17 @@ export default function WireRenderer({
           to.x, to.y,
         ]
 
+        const strokeColor = isSelected ? '#facc15' : isBroken ? '#ef4444' : '#22d3ee'
+        const strokeW = isSelected ? 3 : isBroken ? 2 : 2
+        const dashPattern = isBroken && !isSelected ? [8, 4] : undefined
+
         return (
           <Line
             key={`wire-${idx}`}
             points={points}
-            stroke={isSelected ? '#facc15' : '#22d3ee'}
-            strokeWidth={isSelected ? 3 : 2}
+            stroke={strokeColor}
+            strokeWidth={strokeW}
+            dash={dashPattern}
             hitStrokeWidth={12}
             lineCap="round"
             lineJoin="round"
@@ -75,7 +82,7 @@ export default function WireRenderer({
               container.style.cursor = 'pointer'
             }}
             onMouseLeave={(e) => {
-              e.target.stroke(isSelected ? '#facc15' : '#22d3ee')
+              e.target.stroke(strokeColor)
               const container = e.target.getStage().container()
               container.style.cursor = 'default'
             }}

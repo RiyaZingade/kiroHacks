@@ -177,6 +177,7 @@ export default function ComponentRenderer({
   onPinClick,
   onMove,
   mode,
+  isLit,
 }) {
   const def = getComponentDef(component.type)
   const [col, row] = component.position
@@ -246,7 +247,10 @@ export default function ComponentRenderer({
                 fill={ledColor}
                 stroke={isSelected ? '#facc15' : '#ffffff30'}
                 strokeWidth={isSelected ? 2 : 1}
-                opacity={0.9}
+                opacity={isLit ? 1.0 : 0.9}
+                shadowColor={isLit ? fillColor : undefined}
+                shadowBlur={isLit ? 20 : 0}
+                shadowOpacity={isLit ? 0.8 : 0}
               />
               {/* Inner glow highlight */}
               <Circle

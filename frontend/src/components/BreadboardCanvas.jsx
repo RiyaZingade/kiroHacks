@@ -5,6 +5,7 @@ import WireRenderer from './WireRenderer'
 import ComponentSidebar, { generateId, getCurrentDragType } from './ComponentSidebar'
 import ComponentInspector from './ComponentInspector'
 import CurrentFlowAnimation from './CurrentFlowAnimation'
+import { validateCircuit } from './CircuitValidator'
 
 // P3 owns this file
 // Konva.js breadboard canvas with Agent/Manual mode toggle
@@ -49,6 +50,8 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
   const [wiringFrom, setWiringFrom] = useState(null)
   const [mousePos, setMousePos] = useState(null)
   const [dragPreview, setDragPreview] = useState(null)
+  const [playgroundActive, setPlaygroundActive] = useState(false)
+  const [validationResult, setValidationResult] = useState(null)
   const stageRef = useRef(null)
   const containerRef = useRef(null)
 
@@ -60,6 +63,22 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
     setSelectedComponentId(null)
     setSelectedWireIdx(null)
     setWiringFrom(null)
+  }
+
+  const togglePlaygroundMode = () => {
+    if (!playgroundActive) {
+      // Entering playground mode
+      const result = validateCircuit(components, connections)
+      setValidationResult(result)
+      setPlaygroundActive(true)
+      setWiringFrom(null)
+      setSelectedComponentId(null)
+      setSelectedWireIdx(null)
+    } else {
+      // Exiting playground mode
+      setPlaygroundActive(false)
+      setValidationResult(null)
+    }
   }
 
   const handleComponentSelect = useCallback((id) => {
@@ -97,6 +116,7 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
 
   const handlePinClick = useCallback(
     (componentId, pinName) => {
+      if (playgroundActive) return
       if (mode !== 'manual') return
       if (!wiringFrom) {
         setWiringFrom({ componentId, pinName })
@@ -114,7 +134,7 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
         setWiringFrom(null)
       }
     },
-    [mode, wiringFrom, setCircuit]
+    [mode, wiringFrom, setCircuit, playgroundActive]
   )
 
   const handleWireClick = useCallback((idx) => {
@@ -155,6 +175,7 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
   const handleDrop = useCallback(
     (e) => {
       e.preventDefault()
+      if (playgroundActive) return
       setDragPreview(null)
       const type = e.dataTransfer.getData('component-type')
       if (!type) return
@@ -178,7 +199,7 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
         components: [...prev.components, newComponent],
       }))
     },
-    [components, setCircuit]
+    [components, setCircuit, playgroundActive]
   )
 
   const handleDragOver = useCallback(
@@ -257,7 +278,7 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
         <span className="text-sm font-semibold text-gray-400 uppercase tracking-wide">
           Canvas
         </span>
-        <div className="relative flex bg-gray-800 rounded-full p-0.5 w-48">
+        <div className={`relative flex bg-gray-800 rounded-full p-0.5 w-48 ${playgroundActive ? 'pointer-events-none opacity-50' : ''}`}>
           <div
             className={`absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] rounded-full transition-all duration-300 ease-in-out ${
               mode === 'agent' ? 'left-0.5 bg-blue-600' : 'left-[calc(50%+2px)] bg-purple-600'
@@ -280,6 +301,42 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
             Manual
           </button>
         </div>
+        <button
+          onClick={togglePlaygroundMode}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+            playgroundActive
+              ? 'bg-green-600 text-white'
+              : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+          }`}
+          title="Toggle Playground Mode"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          Playground
+        </button>
+        {playgroundActive && (
+          <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+            components.length === 0
+              ? 'bg-yellow-900/60 text-yellow-300'
+              : validationResult?.valid
+                ? 'bg-green-900/60 text-green-300'
+                : 'bg-red-900/60 text-red-300'
+          }`}>
+            {components.length === 0 ? (
+              <span>No components to simulate</span>
+            ) : validationResult?.valid ? (
+              <span>✓ Circuit works!</span>
+            ) : (
+              <span>
+                ⚠ Circuit incomplete — check your connections
+                {validationResult?.errors?.[0] && (
+                  <span className="ml-1 opacity-75">({validationResult.errors[0]})</span>
+                )}
+              </span>
+            )}
+          </div>
+        )}
         {wiringFrom && (
           <span className="text-xs text-yellow-400 animate-pulse">
             Wiring: click a target pin (Esc to cancel)
@@ -292,6 +349,7 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
         )}
         <div className="ml-auto">
           <button
+            disabled={playgroundActive}
             onClick={() => {
               setCircuit((prev) => ({
                 ...prev,
@@ -302,7 +360,11 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
               setSelectedWireIdx(null)
               setWiringFrom(null)
             }}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-800 hover:bg-red-900/60 text-gray-400 hover:text-red-400 transition-colors"
+            className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${
+              playgroundActive
+                ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                : 'bg-gray-800 hover:bg-red-900/60 text-gray-400 hover:text-red-400'
+            }`}
             title="Clear board"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -394,6 +456,7 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
                 selectedWireIdx={selectedWireIdx}
                 onWireClick={handleWireClick}
                 canvasHeight={CANVAS_H}
+                brokenIndices={playgroundActive ? (validationResult?.brokenConnectionIndices ?? new Set()) : new Set()}
               />
 
               {rubberBandLine && (
@@ -455,13 +518,14 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
                   onSelect={handleComponentSelect}
                   onPinClick={handlePinClick}
                   onMove={handleComponentMove}
-                  mode={mode}
+                  mode={playgroundActive ? 'agent' : mode}
+                  isLit={playgroundActive && validationResult?.ledStates?.get(c.id) === true}
                 />
               ))}
             </Layer>
 
             {/* P4: Current flow animation layer */}
-            <CurrentFlowAnimation components={components} connections={connections} playing={playing} resetCount={resetCount} speed={speed} canvasHeight={CANVAS_H} />
+            <CurrentFlowAnimation components={components} connections={connections} playing={playing || (playgroundActive && validationResult?.valid === true)} resetCount={resetCount} speed={speed} canvasHeight={CANVAS_H} />
           </Stage>
         </div>
 
