@@ -282,17 +282,40 @@ export default function ComponentRenderer({
           )
         }
       case 'button':
+        // Round tactile push button with pin legs
         return (
-          <Rect
-            x={0}
-            y={-halfCell}
-            width={2 * CELL}
-            height={CELL}
-            fill={fillColor}
-            stroke={isSelected ? '#facc15' : '#ffffff20'}
-            strokeWidth={isSelected ? 2 : 1}
-            cornerRadius={6}
-          />
+          <>
+            {/* Pin legs */}
+            <Line points={[0, 0, CELL * 0.3, 0]} stroke="#9ca3af" strokeWidth={1.5} />
+            <Line points={[2 * CELL - CELL * 0.3, 0, 2 * CELL, 0]} stroke="#9ca3af" strokeWidth={1.5} />
+            {/* Button base */}
+            <Circle
+              x={CELL}
+              y={0}
+              radius={halfCell}
+              fill="#4b5563"
+              stroke={isSelected ? '#facc15' : '#6b7280'}
+              strokeWidth={isSelected ? 2 : 1.5}
+            />
+            {/* Button cap */}
+            <Circle
+              x={CELL}
+              y={0}
+              radius={halfCell - 4}
+              fill="#9ca3af"
+              stroke="#d1d5db"
+              strokeWidth={1}
+            />
+            {/* Highlight */}
+            <Circle
+              x={CELL - 2}
+              y={-2}
+              radius={3}
+              fill="#ffffff"
+              opacity={0.25}
+              listening={false}
+            />
+          </>
         )
       case 'power_rail':
         return (
