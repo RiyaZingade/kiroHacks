@@ -13,6 +13,7 @@ export default function ProjectsSidebar({ currentProjectId, onSelectProject, onN
 
   async function loadProjects() {
     setLoading(true)
+    if (!supabase) { setLoading(false); return }
     const { data } = await supabase
       .from('projects')
       .select('id, name, updated_at')
