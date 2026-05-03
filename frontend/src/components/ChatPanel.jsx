@@ -7,7 +7,8 @@ export default function ChatPanel({ circuit, setCircuit }) {
   const [history, setHistory] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [contextWarning, setContextWarning] = useState(false)
+  const [retryLoading, setRetryLoading] = useState(false)
+  const [showApply, setShowApply] = useState(false)
   const bottomRef = useRef(null)
 
   useEffect(() => {
@@ -18,6 +19,7 @@ export default function ChatPanel({ circuit, setCircuit }) {
     if (!input.trim() || loading) return
     const userText = input.trim()
     setInput('')
+    setShowApply(false)
     setMessages(m => [...m, { role: 'user', content: userText }])
     setLoading(true)
 
@@ -31,12 +33,56 @@ export default function ChatPanel({ circuit, setCircuit }) {
       console.log('Chat response:', data)
       setMessages(m => [...m, { role: 'assistant', content: data.reply }])
       setHistory(h => [...h, { role: 'user', content: userText }, { role: 'assistant', content: data.reply }])
-      if (data.updated_circuit) setCircuit(data.updated_circuit)
-      setContextWarning(data.context_warning)
+      if (data.updated_circuit) {
+        setCircuit(data.updated_circuit)
+        setShowApply(false)
+      } else if (userText.toLowerCase().includes('add') ||
+                 userText.toLowerCase().includes('connect') ||
+                 userText.toLowerCase().includes('fix') ||
+                 userText.toLowerCase().includes('change') ||
+                 userText.toLowerCase().includes('build') ||
+                 userText.toLowerCase().includes('create') ||
+                 userText.toLowerCase().includes('make') ||
+                 userText.toLowerCase().includes('wire') ||
+                 userText.toLowerCase().includes('circuit')) {
+        // Agent replied about a circuit change but no JSON came back — show retry
+        setShowApply(true)
+      }
     } catch {
       setMessages(m => [...m, { role: 'assistant', content: '⚠ Could not reach the backend.' }])
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function retryCanvas() {
+    setRetryLoading(true)
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: 'Output the complete updated circuit JSON now. You MUST use the <circuit>...</circuit> tags. Include ALL components and ALL connections including the ones you just described fixing. Do not explain — just output the circuit.',
+          circuit,
+          history,
+        }),
+      })
+      const data = await res.json()
+      if (data.updated_circuit) {
+        setCircuit(data.updated_circuit)
+        setShowApply(false)
+        setMessages(m => [...m, { role: 'assistant', content: '✅ Canvas updated!' }])
+        setHistory(h => [...h,
+          { role: 'user', content: 'Output the complete updated circuit JSON now.' },
+          { role: 'assistant', content: data.reply }
+        ])
+      } else {
+        setMessages(m => [...m, { role: 'assistant', content: '⚠ Still couldn\'t generate the circuit. Try describing it again more simply.' }])
+      }
+    } catch {
+      setMessages(m => [...m, { role: 'assistant', content: '⚠ Could not reach the backend.' }])
+    } finally {
+      setRetryLoading(false)
     }
   }
 
@@ -61,6 +107,23 @@ export default function ChatPanel({ circuit, setCircuit }) {
         )}
         <div ref={bottomRef} />
       </div>
+
+      {showApply && !loading && (
+        <div className="px-4 py-2 border-t border-gray-800 bg-gray-900">
+          <div className="text-xs text-yellow-400 mb-1.5 text-center">Canvas wasn't updated — click to force it:</div>
+          <button
+            onClick={retryCanvas}
+            disabled={retryLoading}
+            className="w-full text-sm font-semibold bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white px-3 py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors border border-purple-400"
+          >
+            {retryLoading ? (
+              <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" /> Applying to Canvas…</>
+            ) : (
+              <>⟳ Apply to Canvas</>
+            )}
+          </button>
+        </div>
+      )}
 
       <div className="px-4 py-3 border-t border-gray-800 flex gap-2">
         <input
