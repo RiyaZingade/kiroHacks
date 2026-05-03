@@ -100,7 +100,7 @@ export default function RunPanel({ circuit, onPlayingChange, onReset, onSpeedCha
       <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Run Panel</h2>
 
       {/* Play Controls */}
-      {hasCode && (
+      {hasCircuit && (
         <div className="flex items-center gap-1.5">
           <button
             onClick={togglePlay}

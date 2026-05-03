@@ -2,10 +2,13 @@ import { useEffect, useRef, useCallback } from 'react'
 import { Layer, Circle } from 'react-konva'
 import { getPinPosition } from './ComponentRenderer'
 
+// P4 owns this file
+// Animates current-flow dots along every wire on the canvas simultaneously
+
 const CELL = 20
-const NUM_DOTS = 4
-const SPEED = 120
-const STAGGER_MS = 600
+const DOTS_PER_WIRE = 2   // dots per individual connection segment
+const SPEED = 100         // px/sec base speed
+const DOT_SPACING = 0.45  // fraction of wire length between dots on same wire
 
 function resolveEndpoint(endpoint, components, canvasHeight) {
   if (endpoint === 'VCC') return { x: CELL * 2, y: CELL * 1 }
@@ -20,24 +23,17 @@ function resolveEndpoint(endpoint, components, canvasHeight) {
   return pins[pinName] ?? null
 }
 
-function buildFullPath(connections, components, canvasHeight) {
-  const waypoints = []
-  for (const conn of connections) {
-    const from = resolveEndpoint(conn.from, components, canvasHeight)
-    const to = resolveEndpoint(conn.to, components, canvasHeight)
-    if (!from || !to) break
-    const midX = (from.x + to.x) / 2
-    if (waypoints.length === 0 || waypoints[waypoints.length - 1].x !== from.x || waypoints[waypoints.length - 1].y !== from.y) {
-      waypoints.push(from)
-    }
-    waypoints.push({ x: midX, y: from.y })
-    waypoints.push({ x: midX, y: to.y })
-    waypoints.push(to)
-  }
-  return waypoints
+// Build the right-angle waypoints for a single connection (same routing as WireRenderer)
+function buildWireWaypoints(from, to) {
+  const midX = (from.x + to.x) / 2
+  return [
+    { x: from.x, y: from.y },
+    { x: midX,   y: from.y },
+    { x: midX,   y: to.y   },
+    { x: to.x,   y: to.y   },
+  ]
 }
 
-// Compute cumulative distances along the path
 function buildPathDistances(waypoints) {
   const dists = [0]
   for (let i = 1; i < waypoints.length; i++) {
@@ -48,11 +44,10 @@ function buildPathDistances(waypoints) {
   return dists
 }
 
-// Get position along path at a given distance
 function positionAtDistance(waypoints, dists, d) {
   const totalLen = dists[dists.length - 1]
   if (totalLen === 0) return waypoints[0]
-  d = Math.max(0, Math.min(d, totalLen))
+  d = ((d % totalLen) + totalLen) % totalLen
   for (let i = 1; i < dists.length; i++) {
     if (d <= dists[i]) {
       const segLen = dists[i] - dists[i - 1]
@@ -67,74 +62,87 @@ function positionAtDistance(waypoints, dists, d) {
 }
 
 export default function CurrentFlowAnimation({ components, connections, playing, resetCount, speed = 1, canvasHeight = 840 }) {
-  const dotsRef = useRef([])
+  const dotsRef = useRef([])       // flat array of Konva Circle nodes
   const animRef = useRef(null)
-  // Track each dot's distance along the path
-  const dotDistances = useRef([])
+  const dotStateRef = useRef([])   // [{ wireIdx, distance }]
   const lastTimeRef = useRef(null)
 
-  const waypoints = buildFullPath(connections || [], components || [], canvasHeight)
-  const hasPath = waypoints.length >= 2
-  const dists = hasPath ? buildPathDistances(waypoints) : []
-  const totalLen = dists.length > 0 ? dists[dists.length - 1] : 0
+  // Build per-wire path data
+  const wiresRef = useRef([])
+  const wires = (connections || []).reduce((acc, conn) => {
+    const from = resolveEndpoint(conn.from, components || [], canvasHeight)
+    const to   = resolveEndpoint(conn.to,   components || [], canvasHeight)
+    if (from && to) {
+      const wp = buildWireWaypoints(from, to)
+      const ds = buildPathDistances(wp)
+      acc.push({ waypoints: wp, dists: ds, totalLen: ds[ds.length - 1] })
+    }
+    return acc
+  }, [])
+  wiresRef.current = wires
 
-  // Store latest waypoints/dists in refs so animation loop sees them
-  const waypointsRef = useRef(waypoints)
-  const distsRef = useRef(dists)
-  const totalLenRef = useRef(totalLen)
+  const totalDots = wires.length * DOTS_PER_WIRE
   const speedRef = useRef(speed)
-  waypointsRef.current = waypoints
-  distsRef.current = dists
-  totalLenRef.current = totalLen
   speedRef.current = speed
 
   const animate = useCallback(() => {
     const now = performance.now()
-    const dt = lastTimeRef.current ? (now - lastTimeRef.current) / 1000 : 0
+    const dt = lastTimeRef.current ? (now - lastTimeRef.current) / 1000 : 0.016
     lastTimeRef.current = now
 
-    const wp = waypointsRef.current
-    const ds = distsRef.current
-    const tl = totalLenRef.current
-    if (tl === 0) return
+    const ws = wiresRef.current
+    const state = dotStateRef.current
 
     dotsRef.current.forEach((dot, i) => {
       if (!dot) return
-      // Advance distance
-      dotDistances.current[i] = (dotDistances.current[i] ?? 0) + SPEED * speedRef.current * dt
-      // Loop back to start
-      if (dotDistances.current[i] > tl) {
-        dotDistances.current[i] = dotDistances.current[i] % tl
+      const s = state[i]
+      if (!s) return
+      const wire = ws[s.wireIdx]
+      if (!wire || wire.totalLen === 0) {
+        dot.visible(false)
+        return
       }
-      const pos = positionAtDistance(wp, ds, dotDistances.current[i])
-      dot.position(pos)
+      s.distance = (s.distance + SPEED * speedRef.current * dt) % wire.totalLen
+      const pos = positionAtDistance(wire.waypoints, wire.dists, s.distance)
+      dot.x(pos.x)
+      dot.y(pos.y)
       dot.visible(true)
       dot.opacity(0.9)
     })
 
-    // Force layer redraw
-    const layer = dotsRef.current[0]?.getLayer()
+    const layer = dotsRef.current.find(Boolean)?.getLayer()
     if (layer) layer.batchDraw()
 
     animRef.current = requestAnimationFrame(animate)
   }, [])
 
-  // Start/stop animation based on playing
+  // Initialize dot state when wires change
   useEffect(() => {
-    if (playing && hasPath) {
+    dotStateRef.current = []
+    wires.forEach((wire, wireIdx) => {
+      for (let d = 0; d < DOTS_PER_WIRE; d++) {
+        dotStateRef.current.push({
+          wireIdx,
+          distance: wire.totalLen * DOT_SPACING * d,
+        })
+      }
+    })
+  }, [connections, components])
+
+  // Start / stop
+  useEffect(() => {
+    if (playing && wires.length > 0) {
       lastTimeRef.current = null
-      // Initialize distances with stagger if not already set
-      dotsRef.current.forEach((_, i) => {
-        if (dotDistances.current[i] == null) {
-          dotDistances.current[i] = -(i * (totalLen / NUM_DOTS) * 0.3)
-        }
-      })
       animRef.current = requestAnimationFrame(animate)
     } else {
-      // Pause — stop the loop but keep dots where they are
       if (animRef.current) {
         cancelAnimationFrame(animRef.current)
         animRef.current = null
+      }
+      if (!playing) {
+        dotsRef.current.forEach((dot) => dot?.visible(false))
+        const layer = dotsRef.current.find(Boolean)?.getLayer()
+        if (layer) layer.batchDraw()
       }
     }
     return () => {
@@ -143,44 +151,48 @@ export default function CurrentFlowAnimation({ components, connections, playing,
         animRef.current = null
       }
     }
-  }, [playing, hasPath, animate])
+  }, [playing, wires.length, animate])
 
-  // Reset — move dots back to start and hide them
+  // Reset
   useEffect(() => {
     if (animRef.current) {
       cancelAnimationFrame(animRef.current)
       animRef.current = null
     }
-    dotDistances.current = []
+    dotStateRef.current = []
     dotsRef.current.forEach((dot) => {
       if (!dot) return
       dot.visible(false)
       dot.opacity(0)
-      if (waypoints[0]) dot.position(waypoints[0])
     })
-    const layer = dotsRef.current[0]?.getLayer()
+    const layer = dotsRef.current.find(Boolean)?.getLayer()
     if (layer) layer.batchDraw()
   }, [resetCount])
 
-  if (!hasPath) return <Layer listening={false} />
+  if (totalDots === 0) return <Layer listening={false} />
 
   return (
     <Layer listening={false}>
-      {Array.from({ length: NUM_DOTS }, (_, i) => (
-        <Circle
-          key={`flow-dot-${i}`}
-          ref={(node) => { dotsRef.current[i] = node }}
-          x={waypoints[0]?.x ?? 0}
-          y={waypoints[0]?.y ?? 0}
-          radius={5 - i * 0.5}
-          fill="#facc15"
-          shadowColor="#facc15"
-          shadowBlur={10 - i * 2}
-          shadowOpacity={0.8}
-          opacity={0}
-          visible={false}
-        />
-      ))}
+      {Array.from({ length: totalDots }, (_, i) => {
+        const wireIdx = Math.floor(i / DOTS_PER_WIRE)
+        const wire = wires[wireIdx]
+        const startPos = wire?.waypoints[0] ?? { x: 0, y: 0 }
+        return (
+          <Circle
+            key={`flow-dot-${i}`}
+            ref={(node) => { dotsRef.current[i] = node }}
+            x={startPos.x}
+            y={startPos.y}
+            radius={4}
+            fill="#facc15"
+            shadowColor="#facc15"
+            shadowBlur={8}
+            shadowOpacity={0.8}
+            opacity={0}
+            visible={false}
+          />
+        )
+      })}
     </Layer>
   )
 }

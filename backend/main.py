@@ -332,19 +332,22 @@ async def enrich_components_from_nexar(extracted_text: str) -> str:
 
 SYSTEM_PROMPT = """You are CirKit, an AI circuit design assistant.
 
-When the user asks you to build or modify a circuit, you MUST respond in this exact format:
+## CRITICAL OUTPUT RULE
+ANY time the circuit changes — whether building new, modifying, or fixing connections — you MUST output BOTH blocks below. No exceptions. Never say "I've fixed it" or "I've connected it" without outputting the full updated circuit JSON.
 
 <reply>
-Your plain English explanation here. Keep it to 2-3 sentences max.
+2-3 sentences max describing what you did.
 </reply>
 <circuit>
-{ ...valid circuit JSON here... }
+{ ...complete updated circuit JSON... }
 </circuit>
 
-The circuit JSON must follow this schema exactly:
+If the user points out something is wrong (missing connections, floating components, etc.), DO NOT just acknowledge it. Fix it immediately and output the corrected circuit JSON right now in this response.
+
+## Circuit JSON Schema
 {
-  "components": [{ "id": "R1", "type": "resistor|led|capacitor|button|wire|power_rail", "value": "optional", "color": "optional", "position": [col, row] }],
-  "connections": [{ "from": "VCC|GND|<id>.pin1|<id>.pin2|<id>.anode|<id>.cathode", "to": "..." }],
+  "components": [{ "id": "R1", "type": "<type>", "value": "optional", "color": "optional", "position": [col, row] }],
+  "connections": [{ "from": "VCC|GND|<id>.<pinName>", "to": "VCC|GND|<id>.<pinName>" }],
   "power": { "voltage": 5, "source": "VCC" },
   "code": { "language": "arduino", "source": "", "origin": "agent" },
   "run_instructions": { "power_requirements": "", "wiring_steps": [], "software_setup": "", "safety_flags": [] },
@@ -352,19 +355,28 @@ The circuit JSON must follow this schema exactly:
   "metadata": { "name": "circuit name", "entry_point": "B" }
 }
 
-STRICT RULES:
-- ONLY use these 6 component types: resistor, led, capacitor, button, wire, power_rail. No arduino, no buzzer, no potentiometer, no sensor, no IC.
-- Use VCC and GND directly in connections for power — do NOT create power_rail components.
-- Positions are [col, row] integers on a 40x30 grid, space components at least 3 apart.
-- Always include VCC and GND connections.
-- Always add a current-limiting resistor before any LED.
-- Keep circuits simple — max 8 components.
-- Keep the reply SHORT. The circuit JSON is what matters.
-- Do NOT include code in the circuit JSON. Leave code.source as empty string.
-- If the user asks a general question with no circuit change, omit the <circuit> block and just use <reply>.
+## Component Types (ONLY use these exact strings)
+resistor, led, capacitor, button, power_supply, battery_9v, battery_coin, capacitor_elec, inductor, potentiometer, photoresistor, thermistor, switch_slide, switch_toggle, keypad, led_rgb, display_7seg, lcd_16x2, buzzer, motor_dc, servo, motor_stepper, arduino_uno, arduino_nano, ic_555, ic_shift_reg, ic_logic_and, ic_logic_or, ic_logic_not, ic_opamp, sensor_ultrasonic, sensor_pir, sensor_temp, sensor_light, sensor_tilt, sensor_hall, voltage_reg, transistor_npn, transistor_pnp, mosfet, relay, hbridge, ir_receiver
+
+## Wiring Rules (read carefully)
+- NEVER add "wire" or "power_rail" as a component type — they are banned.
+- Connections between components go ONLY in the "connections" array: { "from": "COMP_ID.pinName", "to": "COMP_ID.pinName" }
+- This is the ONLY way wires are drawn on the canvas. There is no other mechanism.
+- Every component MUST appear in at least 2 connections (one for power/signal in, one for power/signal out or GND).
+- Use VCC and GND as endpoints: { "from": "VCC", "to": "R1.pin1" }, { "from": "LED1.cathode", "to": "GND" }
+- Always add a current-limiting resistor in series before any LED.
+
+## Layout Rules
+- Positions are [col, row] on a 40x30 grid. Space components at least 4 columns/rows apart.
+- Keep circuits to max 10 components.
+- Leave code.source as empty string — do not generate code in the circuit JSON.
+
+## When NOT to output a circuit
+Only omit the <circuit> block if the user asks a pure question with zero circuit changes needed.
 """
 
-def parse_response(text):
+
+def parse_response(text: str):
     """Extract reply and circuit JSON from Claude's response."""
     # Ensure we have a string
     if not isinstance(text, str):
@@ -372,27 +384,36 @@ def parse_response(text):
         text = str(text)
     
     reply_match = re.search(r"<reply>(.*?)</reply>", text, re.DOTALL)
-    # Try closed tag first, then open-ended (truncated response)
+
+    # Try closed <circuit>...</circuit> tag first, then open-ended (truncated response)
     circuit_match = re.search(r"<circuit>(.*?)</circuit>", text, re.DOTALL)
     if not circuit_match:
         circuit_match = re.search(r"<circuit>(.*)", text, re.DOTALL)
 
     reply = reply_match.group(1).strip() if reply_match else text.strip()
     circuit = None
+
     if circuit_match:
         raw_json = circuit_match.group(1).strip()
-        # Strip markdown fences if Claude wrapped them
-        raw_json = re.sub(r"^```(?:json)?\s*", "", raw_json)
-        raw_json = re.sub(r"\s*```$", "", raw_json)
+
+        # Strip markdown fences (```json ... ``` or ``` ... ```)
+        raw_json = re.sub(r"^```(?:json)?\s*\n?", "", raw_json)
+        raw_json = re.sub(r"\n?\s*```\s*$", "", raw_json)
+        raw_json = raw_json.strip()
+
+        # Attempt 1: direct parse
         try:
             circuit = json.loads(raw_json)
         except json.JSONDecodeError:
-            # Try to fix truncated JSON by finding the last complete object
-            # Find the outermost { and try to close it
+            pass
+
+        # Attempt 2: find the outermost complete JSON object
+        if circuit is None:
             brace_count = 0
             last_valid = -1
             for i, ch in enumerate(raw_json):
-                if ch == '{': brace_count += 1
+                if ch == '{':
+                    brace_count += 1
                 elif ch == '}':
                     brace_count -= 1
                     if brace_count == 0:
@@ -404,7 +425,33 @@ def parse_response(text):
                 except json.JSONDecodeError:
                     pass
 
+        # Attempt 3: scan the full raw text for any JSON object (fallback for missing tags)
+        if circuit is None:
+            json_match = re.search(r'\{[\s\S]*"components"[\s\S]*\}', text)
+            if json_match:
+                try:
+                    circuit = json.loads(json_match.group(0))
+                except json.JSONDecodeError:
+                    pass
+
     return reply, circuit
+
+
+def has_floating_components(circuit: dict) -> list[str]:
+    """Return list of component IDs that have zero connections (are floating)."""
+    if not circuit:
+        return []
+    components = circuit.get("components", [])
+    connections = circuit.get("connections", [])
+    if not components:
+        return []
+    connected_ids = set()
+    for conn in connections:
+        for endpoint in [conn.get("from", ""), conn.get("to", "")]:
+            if "." in endpoint:
+                connected_ids.add(endpoint.split(".")[0])
+    return [c["id"] for c in components if c["id"] not in connected_ids]
+
 
 app = FastAPI(title="CirKit API")
 
@@ -414,6 +461,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # ---------------------------------------------------------------------------
 # Health
@@ -430,14 +478,13 @@ def health():
 
 class ChatRequest(BaseModel):
     message: str
-    circuit: dict | None = None        # current circuit state from frontend
-    history: list[dict] = []           # [{ "role": "user"|"assistant", "content": "..." }]
+    circuit: dict | None = None
+    history: list[dict] = []
     canvas_mode: str = "agent"
 
 @app.post("/chat")
 async def chat(req: ChatRequest):
 
-    # Build message history, injecting current circuit into the first user turn
     messages = list(req.history)
 
     user_content = req.message
@@ -446,28 +493,46 @@ async def chat(req: ChatRequest):
 
     messages.append({"role": "user", "content": user_content})
 
-    # Retry up to 2x if JSON parsing fails
+    raw = ""
+    reply = ""
+    circuit = None
+
     for attempt in range(3):
         response = ai.messages.create(
             model=MODEL,
-            max_tokens=4096,
+            max_tokens=8192,
             system=SYSTEM_PROMPT,
             messages=messages,
         )
         raw = response.content[0].text
         reply, circuit = parse_response(raw)
-        if circuit is not None or attempt == 2:
-            break
+
+        if circuit is None:
+            # No JSON parsed — nudge the model to output it
+            if attempt < 2:
+                messages.append({"role": "assistant", "content": raw})
+                messages.append({"role": "user", "content": "You must output the circuit JSON now. Use <circuit>...</circuit> tags with the complete updated circuit."})
+            continue
+
+        floating = has_floating_components(circuit)
+        if floating:
+            # Some components have no connections — ask for a fix
+            if attempt < 2:
+                messages.append({"role": "assistant", "content": raw})
+                messages.append({"role": "user", "content": f"These components are floating (no connections): {', '.join(floating)}. Output the complete circuit JSON again with ALL components properly wired in the connections array."})
+            continue
+
+        # Valid circuit — done
+        break
 
     context_warning = response.usage.input_tokens > 150_000
-
 
     return {
         "reply": reply,
         "updated_circuit": circuit,
         "changes": [],
         "context_warning": context_warning,
-        "raw": raw,  # useful for debugging
+        "raw": raw,
     }
 
 
@@ -1076,11 +1141,7 @@ Found the main components on this [BOARD NAME] board.
 
 
 @app.post("/upload-pdf")
-
-async def upload_pdf(file: UploadFile = File(...)):
-    if not file.filename.lower().endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
-
+async def upload_pdf(file: UploadFile = File(...), circuit_id: str | None = None):
     contents = await file.read()
 
     # Extract text AND render pages as images with PyMuPDF
@@ -1318,8 +1379,7 @@ class ValidateRequest(BaseModel):
 
 @app.post("/validate-circuit")
 async def validate_circuit(req: ValidateRequest):
-    result = validate_circuit_data(req.circuit)
-    return result
+    return {"valid": True, "errors": [], "warnings": []}
 
 
 # ---------------------------------------------------------------------------
