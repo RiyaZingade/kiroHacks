@@ -38,10 +38,10 @@ uvicorn main:app --reload
 
 | Person | File(s) to work in |
 |--------|-------------------|
-| P1 | `frontend/src/components/ChatPanel.jsx` · `backend/main.py` → `/chat` route |
-| P2 | `frontend/src/components/PDFUpload.jsx` · `backend/main.py` → `/upload-pdf`, `/validate-circuit` |
-| P3 | `frontend/src/components/BreadboardCanvas.jsx` + new `ComponentSidebar.jsx`, `ComponentInspector.jsx` |
-| P4 | `frontend/src/components/RunPanel.jsx` + new `CodeEditor.jsx`, `CurrentFlowAnimation.jsx` · `backend/main.py` → `/generate-code` |
+| Riya Zingade | `frontend/src/components/ChatPanel.jsx` · `backend/main.py` → `/chat` route |
+| Sahaana Sridhar | `frontend/src/components/PDFUpload.jsx` · `backend/main.py` → `/upload-pdf`, `/validate-circuit` |
+| Sanjana Narasimhan| `frontend/src/components/BreadboardCanvas.jsx` + new `ComponentSidebar.jsx`, `ComponentInspector.jsx` |
+| Prasiddha Aravind | `frontend/src/components/RunPanel.jsx` + new `CodeEditor.jsx`, `CurrentFlowAnimation.jsx` · `backend/main.py` → `/generate-code` |
 
 See `features.md` for the full feature list per person.
 
