@@ -1,8 +1,22 @@
 import { useState } from 'react'
 import ChatPanel from './ChatPanel'
 
-export default function ChatWidget({ circuit, setCircuit, initialOpen = false }) {
+const ExpandIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 12h18M3 12l6-6M3 12l6 6" />
+  </svg>
+)
+
+const CloseIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+  </svg>
+)
+
+export default function ChatWidget({ circuit, setCircuit, expanded, setExpanded, initialOpen = false }) {
   const [open, setOpen] = useState(initialOpen)
+
+  if (expanded) return null
 
   return (
     <div className="fixed bottom-4 left-4 z-50">
