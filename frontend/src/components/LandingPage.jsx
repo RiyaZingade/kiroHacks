@@ -109,8 +109,7 @@ export default function LandingPage() {
             { label: '🤖 AI Agent', href: '/app?mode=agent&chat=open' },
             { label: '📋 PDF Import', href: '/app?upload=pdf' },
             { label: '🔧 Manual Mode', href: '/app?mode=manual' },
-            { label: '⚡ Current Flow', href: '/app?play=true' },
-            { label: '💻 Code Gen', href: '/app?generate=true' },
+            { label: '🎮 Playground', href: '/app' },
           ].map((f) => (
             <a key={f.label} href={f.href} className="px-3 py-1.5 rounded-full text-xs font-medium bg-gray-800/80 text-gray-300 border border-gray-700/50 hover:border-emerald-500/50 hover:text-emerald-300 transition-colors cursor-pointer">
               {f.label}

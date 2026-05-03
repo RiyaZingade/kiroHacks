@@ -10,7 +10,7 @@ We didn't just use Kiro as a code generator. We used it as our **development ope
 
 ## Phase 1: Design Doc → Spec Pipeline
 
-We started before writing a single line of code. Our first move was drafting a comprehensive design document with Claude — a 28,000-character product spec covering architecture, entry points, canvas modes, component schemas, and integration checkpoints. This became `CirKit_markdown.md`.
+We started before writing a single line of code. Our first move was drafting a comprehensive design document with Claude — a 28,000-character product spec covering architecture, entry points, canvas modes, component schemas, and integration checkpoints. This became [`CirKit_markdown.md`](CirKit_markdown.md) (the full markdown spec) alongside the original [`CirKit_v1.2.docx`](CirKit_v1.2.docx) (the formatted Word document).
 
 But a design doc sitting in a Word file doesn't help an AI agent build software. So we **converted it into Kiro's spec system** — a structured `requirements.md` → `design.md` → `tasks.md` pipeline inside `.kiro/specs/`. This wasn't a one-shot conversion. We iterated on the specs multiple times:
 
