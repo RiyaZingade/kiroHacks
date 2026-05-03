@@ -52,8 +52,11 @@ export default function ChatWidget({ circuit, setCircuit, expanded, setExpanded,
           className="w-12 h-12 bg-blue-600 hover:bg-blue-500 rounded-full shadow-lg flex items-center justify-center transition-colors"
           aria-label="Open chat"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+            <rect x="4" y="6" width="16" height="12" rx="2" />
+            <line x1="8" y1="10" x2="12" y2="10" />
+            <line x1="12" y1="10" x2="12" y2="14" />
+            <line x1="12" y1="14" x2="16" y2="14" />
           </svg>
         </button>
       )}

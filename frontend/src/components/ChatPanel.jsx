@@ -42,11 +42,13 @@ export default function ChatPanel({ circuit, setCircuit }) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
+      <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`text-sm px-3 py-2 rounded-lg max-w-[85%] whitespace-pre-wrap ${
-              m.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-100'
+            <div className={`relative text-sm px-4 py-2.5 max-w-[80%] whitespace-pre-wrap ${
+              m.role === 'user'
+                ? 'bg-blue-600 text-white rounded-2xl rounded-br-md'
+                : 'bg-gray-800 text-gray-100 rounded-2xl rounded-bl-md'
             }`}>
               {m.content}
             </div>
@@ -54,7 +56,7 @@ export default function ChatPanel({ circuit, setCircuit }) {
         ))}
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-gray-800 text-gray-400 text-sm px-3 py-2 rounded-lg">Thinking…</div>
+            <div className="bg-gray-800 text-gray-400 text-sm px-4 py-2.5 rounded-2xl rounded-bl-md">Computing…</div>
           </div>
         )}
         <div ref={bottomRef} />
