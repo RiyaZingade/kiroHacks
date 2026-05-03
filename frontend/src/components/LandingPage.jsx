@@ -92,7 +92,7 @@ export default function LandingPage() {
           </div>
           <h1 className="text-6xl font-bold tracking-tight">
             <span className="text-white">Cir</span>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-500">Kit</span>
+            <span style={{ background: 'linear-gradient(to right, #34d399, #06b6d4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Kit</span>
           </h1>
         </div>
 
