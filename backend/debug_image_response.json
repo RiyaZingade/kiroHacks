@@ -189,3 +189,149 @@ Looking at this Arduino Uno Rev3 circuit board, I can identify these key compone
   "metadata": {"name": "Arduino Uno Rev3", "analysis_method": "component_identification"}
 }
 </circuit>
+
+
+=== APPROACH: simplified ===
+Components found: 8
+RAW RESPONSE:
+Looking at this circuit board image, I can identify the following key components:
+
+**MOST IMPORTANT COMPONENTS:**
+
+1. **USB** - connector - USB-C connector - Position: [85, 50]
+2. **MCU** - ic - Main microcontroller (NANO label visible) - Position: [25, 50] 
+3. **RST_BTN** - button - Reset button - Position: [70, 35]
+4. **PWR_LED** - led - Power indicator LED - Position: [75, 65]
+5. **TOP_PINS** - pin - Top row pin headers (12,11,10,9,8,7,6,5,4,3,2,GND,RST,RXD,TXD) - Position: [50, 15]
+6. **BOTTOM_PINS** - pin - Bottom row pin headers (13,3V3,AREF,A0,A1,A2,A3,A4,A5,A6,A7,5V,RST,GND,VIN) - Position: [50, 85]
+7. **CRYSTAL** - ic - Crystal oscillator (16.8 328 marking) - Position: [45, 65]
+8. **STATUS_LED** - led - Status/Pin 13 LED - Position: [90, 70]
+
+<circuit>
+{
+  "components": [
+    {"id": "USB", "type": "connector", "value": "USB-C", "position": [85, 50], "position_type": "percent"},
+    {"id": "MCU", "type": "ic", "value": "NANO MCU", "position": [25, 50], "position_type": "percent"},
+    {"id": "RST_BTN", "type": "button", "value": "RST", "position": [70, 35], "position_type": "percent"},
+    {"id": "PWR_LED", "type": "led", "value": "Power LED", "position": [75, 65], "position_type": "percent"},
+    {"id": "TOP_PINS", "type": "pin", "value": "Digital/Power Pins", "position": [50, 15], "position_type": "percent"},
+    {"id": "BOTTOM_PINS", "type": "pin", "value": "Analog/Power Pins", "position": [50, 85], "position_type": "percent"},
+    {"id": "CRYSTAL", "type": "ic", "value": "16MHz Crystal", "position": [45, 65], "position_type": "percent"},
+    {"id": "STATUS_LED", "type": "led", "value": "Pin 13 LED", "position": [90, 70], "position_type": "percent"}
+  ],
+  "connections": [],
+  "power": {"voltage": 5, "source": "USB"},
+  "canvas_mode": "arduino", 
+  "metadata": {"name": "Arduino Nano Board", "analysis_method": "component_identification"}
+}
+</circuit>
+
+
+=== APPROACH: basic ===
+Components found: 5
+RAW RESPONSE:
+Looking at this Arduino Nano board, I can identify the main components:
+
+<reply>
+Found the main components on this Arduino Nano board.
+</reply>
+
+<circuit>
+{
+  "components": [
+    {"id": "USB", "type": "connector", "value": "USB Mini", "position": [85, 50], "position_type": "percent"},
+    {"id": "MCU", "type": "ic", "value": "ATmega328", "position": [45, 50], "position_type": "percent"},
+    {"id": "LED1", "type": "led", "value": "Power LED", "position": [75, 65], "position_type": "percent"},
+    {"id": "LED2", "type": "led", "value": "Pin 13 LED", "position": [70, 65], "position_type": "percent"},
+    {"id": "RST", "type": "button", "value": "Reset", "position": [60, 35], "position_type": "percent"}
+  ],
+  "connections": [],
+  "power": {"voltage": 5, "source": "USB"},
+  "canvas_mode": "arduino",
+  "metadata": {"name": "Arduino Nano Analysis"}
+}
+</circuit>
+
+The main components I identified:
+1. **USB connector**: Mini USB port on the right side (~85% width, 50% height)
+2. **Main chip**: ATmega328 microcontroller in the center-left (~45% width, 50% height) 
+3. **LEDs**: Two small LEDs on the right side - power and pin 13 indicators (~70-75% width, 65% height)
+4. **Reset button**: Small tactile switch in the upper center area (~60% width, 35% height)
+
+Note: I don't see a separate power jack on this Nano board - it's powered via USB or the VIN pin.
+
+
+=== APPROACH: basic ===
+Components found: 6
+RAW RESPONSE:
+Looking at this circuit board, I can identify:
+
+1. **Board name/model**: This appears to be an **ESP32 NANO** based on the text visible on the board.
+
+2. **Main components identified**:
+
+Found the main components on this ESP32 NANO board.
+
+<circuit>
+{
+  "components": [
+    {"id": "USB", "type": "connector", "value": "USB-C", "position": [75, 50], "position_type": "percent"},
+    {"id": "MCU", "type": "ic", "value": "ESP32", "position": [35, 50], "position_type": "percent"},
+    {"id": "LED1", "type": "led", "value": "Power LED", "position": [60, 40], "position_type": "percent"},
+    {"id": "BTN1", "type": "button", "value": "Reset", "position": [85, 45], "position_type": "percent"},
+    {"id": "PINS_TOP", "type": "connector", "value": "GPIO Header", "position": [50, 15], "position_type": "percent"},
+    {"id": "PINS_BOTTOM", "type": "connector", "value": "GPIO Header", "position": [50, 85], "position_type": "percent"}
+  ],
+  "connections": [],
+  "power": {"voltage": 5, "source": "USB"},
+  "canvas_mode": "agent",
+  "metadata": {"name": "ESP32 NANO Analysis", "board_type": "microcontroller"}
+}
+</circuit>
+
+**Component positions**:
+- **USB-C connector**: Right side, ~75% width, 50% height
+- **Main ESP32 chip**: Center-left, ~35% width, 50% height  
+- **Power LED**: Center area, ~60% width, 40% height
+- **Reset button**: Right side near USB, ~85% width, 45% height
+- **GPIO pin headers**: Top and bottom edges spanning the full width
+- **Pin labels**: Clearly visible including power pins (3V3, 5V, GND), analog pins (A0-A7), and digital pins
+
+This is a compact ESP32 development board in the Arduino Nano form factor with USB-C connectivity.
+
+
+=== APPROACH: basic ===
+Components found: 6
+RAW RESPONSE:
+Looking at this circuit board, I can identify:
+
+1. **Board name/model**: This appears to be a **NANO V3** board (visible text on the left side)
+
+2. **Main components identified**:
+
+Found the main components on this NANO V3 board.
+
+<circuit>
+{
+  "components": [
+    {"id": "USB", "type": "connector", "value": "USB Mini", "position": [75, 50], "position_type": "percent"},
+    {"id": "MCU", "type": "ic", "value": "ATmega328", "position": [35, 50], "position_type": "percent"},
+    {"id": "LED1", "type": "led", "value": "Power LED", "position": [55, 35], "position_type": "percent"},
+    {"id": "LED2", "type": "led", "value": "Pin 13 LED", "position": [60, 35], "position_type": "percent"},
+    {"id": "BTN1", "type": "button", "value": "Reset", "position": [45, 35], "position_type": "percent"},
+    {"id": "PWR", "type": "connector", "value": "Power Jack", "position": [5, 50], "position_type": "percent"}
+  ],
+  "connections": [],
+  "power": {"voltage": 5, "source": "USB"},
+  "canvas_mode": "agent",
+  "metadata": {"name": "Arduino Nano V3", "board_type": "microcontroller"}
+}
+</circuit>
+
+**Component positions**:
+- **USB connector**: Mini USB port at ~75% width, center height
+- **Main chip**: ATmega328 microcontroller at ~35% width, center
+- **Power connector**: Barrel jack at ~5% width (far left)
+- **LEDs**: Two small LEDs at ~55-60% width, upper portion
+- **Reset button**: Small tactile button at ~45% width, upper portion
+- **Pin headers**: GPIO pins along top and bottom edges of the board

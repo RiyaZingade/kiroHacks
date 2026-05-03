@@ -70,6 +70,7 @@
   "canvas_mode": "arduino",
   "metadata": {
     "name": "Arduino UNO",
+    "board_type": "uno",
     "entry_point": "USB"
   }
 }

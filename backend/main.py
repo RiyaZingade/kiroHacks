@@ -785,9 +785,10 @@ Focus ONLY on these key components:
 For each component, provide:
 - Simple ID (USB, MCU, LED1, etc.)
 - Basic type (connector, ic, led, button, pin)
-- Short label (what you see written)
+- Short label (what you see written on the board)
 - Position as percentage (0-100)
 
+First identify the board name from any silkscreen text visible (e.g. "Arduino Nano", "Arduino Uno", "ESP32", etc.)
 KEEP IT SIMPLE - maximum 12 components total.
 
 <reply>
@@ -801,8 +802,8 @@ I've identified the key components on this circuit board.
   ],
   "connections": [],
   "power": {"voltage": 5, "source": "USB"},
-  "canvas_mode": "arduino",
-  "metadata": {"name": "Circuit Board", "analysis_method": "simplified"}
+  "canvas_mode": "agent",
+  "metadata": {"name": "Circuit Board", "board_type": "unknown", "analysis_method": "simplified"}
 }
 </circuit>"""
 
@@ -811,7 +812,8 @@ I've identified the key components on this circuit board.
             # Multi-approach analysis for better accuracy
             detailed_scan_prompt = """Perform a detailed scan of this circuit board image from left to right, top to bottom.
 
-Scan the image systematically and report every component you can see with its approximate position as percentages.
+First, identify the board name/model from any text printed on the board (silkscreen).
+Then scan the image systematically and report every component you can see with its approximate position as percentages.
 
 <reply>
 I've performed a systematic scan of the circuit board and identified all visible components.
@@ -823,39 +825,38 @@ I've performed a systematic scan of the circuit board and identified all visible
   ],
   "connections": [],
   "power": {"voltage": 5, "source": "detected"},
-  "canvas_mode": "arduino",
-  "metadata": {"name": "Scanned Circuit Board", "analysis_method": "systematic_scan"}
+  "canvas_mode": "agent",
+  "metadata": {"name": "Scanned Circuit Board", "board_type": "unknown", "analysis_method": "systematic_scan"}
 }
 </circuit>"""
 
             landmark_prompt = """Analyze this circuit board by identifying key landmarks first, then positioning components relative to those landmarks.
 
-STEP 1: Find these landmarks in order of priority:
-1. USB connector (usually rectangular, metallic, on left edge)
-2. Power jack (usually black cylinder, on left edge) 
-3. Main microcontroller (largest rectangular IC, usually center-right)
-4. Pin headers (rows of small pins, usually on right and bottom edges)
+STEP 1: Read any board name/model text printed on the silkscreen (e.g. "Arduino Nano", "Arduino Uno R3", "ESP32 DevKit", etc.)
 
-STEP 2: For each landmark found, note its position as percentage coordinates
+STEP 2: Find these landmarks in order of priority:
+1. USB connector (usually rectangular, metallic, on an edge)
+2. Power jack or connector (on an edge)
+3. Main microcontroller (largest rectangular IC)
+4. Pin headers (rows of small pins, usually on edges)
 
 STEP 3: Position all other components relative to these landmarks
 
 Use this format:
 
 <reply>
-I've identified key landmarks and positioned all components relative to them for accurate placement.
+I've identified the board as [BOARD NAME] and positioned all components relative to key landmarks.
 </reply>
 <circuit>
 {
   "components": [
     {"id": "USB", "type": "connector", "value": "USB", "position": [X, Y], "position_type": "percent", "landmark": true},
-    {"id": "POWER", "type": "connector", "value": "Power", "position": [X, Y], "position_type": "percent", "landmark": true},
     {"id": "MCU", "type": "ic", "value": "Main MCU", "position": [X, Y], "position_type": "percent", "landmark": true}
   ],
   "connections": [],
   "power": {"voltage": 5, "source": "detected"},
-  "canvas_mode": "arduino",
-  "metadata": {"name": "Landmark-Based Analysis", "analysis_method": "landmark_positioning"}
+  "canvas_mode": "agent",
+  "metadata": {"name": "Landmark-Based Analysis", "board_type": "unknown", "analysis_method": "landmark_positioning"}
 }
 </circuit>"""
             
@@ -863,23 +864,20 @@ I've identified key landmarks and positioned all components relative to them for
 
 STEP 1: TEXT DETECTION
 Scan the entire board and list every piece of text you can see:
+- Board name/model printed on silkscreen (MOST IMPORTANT — e.g. "Arduino Nano", "Arduino Uno", "ESP32")
 - Component labels (U1, R1, C1, etc.)
 - Pin labels (D0, D1, A0, A1, VIN, GND, etc.) 
-- IC markings (ATmega328P, etc.)
+- IC markings (ATmega328P, ATmega16U2, CH340, etc.)
 - Connector labels (USB, POWER, etc.)
-- Any other visible text
 
 STEP 2: COMPONENT IDENTIFICATION
-For each text label found, identify:
-- What type of component it represents
-- Its exact position on the board
-- Its relationship to other labeled components
+For each text label found, identify what type of component it represents and its position.
 
 STEP 3: POSITION MAPPING
 Use the text positions to create an accurate component map.
 
 <reply>
-I've read all visible text labels and used them to accurately map component positions.
+I've read all visible text labels and identified the board as [BOARD NAME].
 </reply>
 <circuit>
 {
@@ -888,60 +886,50 @@ I've read all visible text labels and used them to accurately map component posi
   ],
   "connections": [],
   "power": {"voltage": 5, "source": "detected"},
-  "canvas_mode": "arduino",
-  "metadata": {"name": "OCR-Based Analysis", "analysis_method": "text_detection"}
+  "canvas_mode": "agent",
+  "metadata": {"name": "OCR-Based Analysis", "board_type": "unknown", "analysis_method": "text_detection"}
 }
 </circuit>"""
 
             spatial_prompt = """Analyze this circuit board using spatial relationships and component boundaries.
 
-STEP 1: BOARD BOUNDARY DETECTION
+STEP 1: BOARD IDENTIFICATION
+Read any text on the board to identify the board name/model.
+
+STEP 2: BOARD BOUNDARY DETECTION
 - Identify the exact edges of the circuit board
 - Note the board's aspect ratio and orientation
 
-STEP 2: SPATIAL ZONES
-Divide the board into functional zones:
-- Left edge zone (0-15%): Usually connectors (USB, power)
-- Top zone (0-20%): Usually buttons, LEDs, labels
-- Center zone (20-80%): Usually main ICs and components  
-- Right edge zone (85-100%): Usually pin headers
-- Bottom zone (80-100%): Usually pin headers and labels
+STEP 3: SPATIAL ZONES
+Divide the board into functional zones and identify components in each zone.
 
-STEP 3: COMPONENT BOUNDARY ANALYSIS
-For each component:
-- Identify its exact boundaries
-- Measure its size relative to the board
-- Note its spatial relationship to board edges
-- Calculate precise percentage coordinates
+STEP 4: COMPONENT BOUNDARY ANALYSIS
+For each component, calculate precise percentage coordinates.
 
 <reply>
-I've analyzed the board using spatial relationships and component boundaries for precise positioning.
+I've identified the board as [BOARD NAME] and analyzed it using spatial relationships.
 </reply>
 <circuit>
 {
   "components": [
-    {"id": "COMP1", "type": "type", "value": "label", "position": [X, Y], "position_type": "percent", "zone": "left_edge", "size": [w, h]}
+    {"id": "COMP1", "type": "type", "value": "label", "position": [X, Y], "position_type": "percent"}
   ],
   "connections": [],
   "power": {"voltage": 5, "source": "detected"},
-  "canvas_mode": "arduino",
-  "metadata": {"name": "Spatial Analysis", "analysis_method": "spatial_boundaries"}
+  "canvas_mode": "agent",
+  "metadata": {"name": "Spatial Analysis", "board_type": "unknown", "analysis_method": "spatial_boundaries"}
 }
 </circuit>"""
 
             # Simplified approaches - only use the most effective ones
-            simple_prompt = """Look at this circuit board and find the main components:
+            simple_prompt = """Look at this circuit board and identify:
+1. The board name/model from any text printed on it
+2. The main components: USB connector, power connector, main chip, LEDs, reset button
 
-1. USB connector (rectangular metal connector)
-2. Power jack (round black connector) 
-3. Main chip (largest rectangular IC)
-4. LEDs (small colored lights)
-5. Reset button (small button)
-
-For each one you see, give its position as percentage of board width/height.
+For each component you see, give its position as percentage of board width/height.
 
 <reply>
-Found the main components.
+Found the main components on this [BOARD NAME] board.
 </reply>
 <circuit>
 {
@@ -951,8 +939,8 @@ Found the main components.
   ],
   "connections": [],
   "power": {"voltage": 5, "source": "USB"},
-  "canvas_mode": "arduino",
-  "metadata": {"name": "Simple Analysis"}
+  "canvas_mode": "agent",
+  "metadata": {"name": "Simple Analysis", "board_type": "unknown"}
 }
 </circuit>"""
             
@@ -1038,69 +1026,20 @@ Found the main components.
             import traceback
             traceback.print_exc()
             
-            # Fallback: create accurate Arduino UNO layout with precise positioning
+            # Fallback: minimal generic board layout — don't assume UNO
             circuit = {
                 "components": [
-                    {"id": "USB", "type": "connector", "value": "USB-B", "position": [1, 50], "position_type": "percent"},
-                    {"id": "PWR_JACK", "type": "connector", "value": "Power Jack", "position": [1, 25], "position_type": "percent"},
-                    {"id": "MCU", "type": "ic", "value": "ATmega328P", "position": [60, 65], "position_type": "percent"},
-                    {"id": "USB_MCU", "type": "ic", "value": "ATmega16U2", "position": [30, 35], "position_type": "percent"},
+                    {"id": "USB", "type": "connector", "value": "USB", "position": [5, 50], "position_type": "percent"},
+                    {"id": "MCU", "type": "ic", "value": "MCU", "position": [50, 50], "position_type": "percent"},
                     {"id": "RESET", "type": "button", "value": "Reset", "position": [25, 15], "position_type": "percent"},
-                    {"id": "PWR_LED", "type": "led", "value": "ON", "color": "green", "position": [85, 15], "position_type": "percent"},
-                    {"id": "LED_L", "type": "led", "value": "L", "color": "orange", "position": [80, 15], "position_type": "percent"},
-                    {"id": "LED_RX", "type": "led", "value": "RX", "color": "yellow", "position": [75, 15], "position_type": "percent"},
-                    {"id": "LED_TX", "type": "led", "value": "TX", "color": "yellow", "position": [70, 15], "position_type": "percent"},
-                    
-                    {"id": "D0", "type": "pin", "value": "D0/RX", "position": [98, 25], "position_type": "percent"},
-                    {"id": "D1", "type": "pin", "value": "D1/TX", "position": [98, 31], "position_type": "percent"},
-                    {"id": "D2", "type": "pin", "value": "D2", "position": [98, 37], "position_type": "percent"},
-                    {"id": "D3", "type": "pin", "value": "D3~", "position": [98, 43], "position_type": "percent"},
-                    {"id": "D4", "type": "pin", "value": "D4", "position": [98, 49], "position_type": "percent"},
-                    {"id": "D5", "type": "pin", "value": "D5~", "position": [98, 55], "position_type": "percent"},
-                    {"id": "D6", "type": "pin", "value": "D6~", "position": [98, 61], "position_type": "percent"},
-                    {"id": "D7", "type": "pin", "value": "D7", "position": [98, 67], "position_type": "percent"},
-                    
-                    {"id": "D8", "type": "pin", "value": "D8", "position": [88, 25], "position_type": "percent"},
-                    {"id": "D9", "type": "pin", "value": "D9~", "position": [88, 31], "position_type": "percent"},
-                    {"id": "D10", "type": "pin", "value": "D10~", "position": [88, 37], "position_type": "percent"},
-                    {"id": "D11", "type": "pin", "value": "D11~", "position": [88, 43], "position_type": "percent"},
-                    {"id": "D12", "type": "pin", "value": "D12", "position": [88, 49], "position_type": "percent"},
-                    {"id": "D13", "type": "pin", "value": "D13", "position": [88, 55], "position_type": "percent"},
-                    {"id": "GND1", "type": "pin", "value": "GND", "position": [88, 61], "position_type": "percent"},
-                    {"id": "AREF", "type": "pin", "value": "AREF", "position": [88, 67], "position_type": "percent"},
-                    
-                    {"id": "IOREF", "type": "pin", "value": "IOREF", "position": [15, 95], "position_type": "percent"},
-                    {"id": "RESET_PIN", "type": "pin", "value": "RESET", "position": [20, 95], "position_type": "percent"},
-                    {"id": "V3V3", "type": "pin", "value": "3.3V", "position": [25, 95], "position_type": "percent"},
-                    {"id": "V5", "type": "pin", "value": "5V", "position": [30, 95], "position_type": "percent"},
-                    {"id": "GND2", "type": "pin", "value": "GND", "position": [35, 95], "position_type": "percent"},
-                    {"id": "GND3", "type": "pin", "value": "GND", "position": [40, 95], "position_type": "percent"},
-                    {"id": "VIN", "type": "pin", "value": "VIN", "position": [45, 95], "position_type": "percent"},
-                    
-                    {"id": "A0", "type": "pin", "value": "A0", "position": [50, 95], "position_type": "percent"},
-                    {"id": "A1", "type": "pin", "value": "A1", "position": [55, 95], "position_type": "percent"},
-                    {"id": "A2", "type": "pin", "value": "A2", "position": [60, 95], "position_type": "percent"},
-                    {"id": "A3", "type": "pin", "value": "A3", "position": [65, 95], "position_type": "percent"},
-                    {"id": "A4", "type": "pin", "value": "A4/SDA", "position": [70, 95], "position_type": "percent"},
-                    {"id": "A5", "type": "pin", "value": "A5/SCL", "position": [75, 95], "position_type": "percent"},
-                    
-                    {"id": "ICSP1", "type": "connector", "value": "ICSP", "position": [75, 55], "position_type": "percent"},
-                    {"id": "ICSP2", "type": "connector", "value": "ICSP", "position": [45, 20], "position_type": "percent"}
+                    {"id": "PWR_LED", "type": "led", "value": "PWR", "color": "green", "position": [80, 15], "position_type": "percent"},
                 ],
-                "connections": [
-                    {"from": "USB", "to": "USB_MCU"},
-                    {"from": "USB_MCU", "to": "MCU"},
-                    {"from": "PWR_JACK", "to": "VIN"},
-                    {"from": "V5", "to": "MCU"},
-                    {"from": "D13", "to": "LED_L.anode"},
-                    {"from": "LED_L.cathode", "to": "GND1"},
-                    {"from": "RESET", "to": "MCU"}
-                ],
-                "power": {"voltage": 5, "source": "USB/VIN"},
-                "canvas_mode": "arduino",
-                "metadata": {"name": "Arduino UNO R3 (Fallback)", "entry_point": "USB"}
+                "connections": [],
+                "power": {"voltage": 5, "source": "USB"},
+                "canvas_mode": "agent",
+                "metadata": {"name": "Unknown Board (analysis failed)", "board_type": "unknown", "entry_point": "USB"}
             }
-            reply = f"Used fallback Arduino layout due to analysis error: {str(ai_error)}"
+            reply = f"Could not fully analyze the image. Showing a minimal fallback layout. Try describing the board in chat for better results. Error: {str(ai_error)}"
         
         # Validate before returning
         validation = validate_circuit_data(circuit)
@@ -1174,71 +1113,46 @@ async def upload_pdf(file: UploadFile = File(...)):
         img = Image.open(io.BytesIO(images[0]))
         img_width, img_height = img.size
         
-        vision_prompt = f"""Analyze this Arduino schematic and create a precise Arduino UNO R3 board layout.
+        vision_prompt = f"""You are analyzing a circuit board schematic image. Your job is to identify what board this actually is and extract its real components.
 
-Use the EXACT Arduino UNO R3 component positions as percentages (0,0 = top-left, 100,100 = bottom-right):
+IMPORTANT: Do NOT assume this is an Arduino UNO. Look at the image carefully and identify:
+1. The actual board name/model (Arduino Nano, Uno, Mega, ESP32, Raspberry Pi Pico, custom board, etc.)
+2. The actual components visible on the board
+3. The actual pin layout for that specific board
+
+Respond in this exact format:
 
 <reply>
-I've created an accurate Arduino UNO R3 board layout from your schematic with precise component positioning.
+Brief description of what board you identified and what components you found.
 </reply>
 <circuit>
 {{
   "components": [
-    {{"id": "USB", "type": "connector", "value": "USB-B", "position": [1, 50], "position_type": "percent"}},
-    {{"id": "PWR_JACK", "type": "connector", "value": "Power Jack", "position": [1, 25], "position_type": "percent"}},
-    {{"id": "MCU", "type": "ic", "value": "ATmega328P", "position": [60, 65], "position_type": "percent"}},
-    {{"id": "USB_MCU", "type": "ic", "value": "ATmega16U2", "position": [30, 35], "position_type": "percent"}},
-    {{"id": "RESET", "type": "button", "value": "Reset", "position": [25, 15], "position_type": "percent"}},
-    {{"id": "PWR_LED", "type": "led", "value": "ON", "color": "green", "position": [85, 15], "position_type": "percent"}},
-    {{"id": "LED_L", "type": "led", "value": "L", "color": "orange", "position": [80, 15], "position_type": "percent"}},
-    {{"id": "LED_RX", "type": "led", "value": "RX", "color": "yellow", "position": [75, 15], "position_type": "percent"}},
-    {{"id": "LED_TX", "type": "led", "value": "TX", "color": "yellow", "position": [70, 15], "position_type": "percent"}},
-    {{"id": "D0", "type": "pin", "value": "D0/RX", "position": [98, 25], "position_type": "percent"}},
-    {{"id": "D1", "type": "pin", "value": "D1/TX", "position": [98, 31], "position_type": "percent"}},
-    {{"id": "D2", "type": "pin", "value": "D2", "position": [98, 37], "position_type": "percent"}},
-    {{"id": "D3", "type": "pin", "value": "D3~", "position": [98, 43], "position_type": "percent"}},
-    {{"id": "D4", "type": "pin", "value": "D4", "position": [98, 49], "position_type": "percent"}},
-    {{"id": "D5", "type": "pin", "value": "D5~", "position": [98, 55], "position_type": "percent"}},
-    {{"id": "D6", "type": "pin", "value": "D6~", "position": [98, 61], "position_type": "percent"}},
-    {{"id": "D7", "type": "pin", "value": "D7", "position": [98, 67], "position_type": "percent"}},
-    {{"id": "D8", "type": "pin", "value": "D8", "position": [88, 25], "position_type": "percent"}},
-    {{"id": "D9", "type": "pin", "value": "D9~", "position": [88, 31], "position_type": "percent"}},
-    {{"id": "D10", "type": "pin", "value": "D10~", "position": [88, 37], "position_type": "percent"}},
-    {{"id": "D11", "type": "pin", "value": "D11~", "position": [88, 43], "position_type": "percent"}},
-    {{"id": "D12", "type": "pin", "value": "D12", "position": [88, 49], "position_type": "percent"}},
-    {{"id": "D13", "type": "pin", "value": "D13", "position": [88, 55], "position_type": "percent"}},
-    {{"id": "GND1", "type": "pin", "value": "GND", "position": [88, 61], "position_type": "percent"}},
-    {{"id": "AREF", "type": "pin", "value": "AREF", "position": [88, 67], "position_type": "percent"}},
-    {{"id": "IOREF", "type": "pin", "value": "IOREF", "position": [15, 95], "position_type": "percent"}},
-    {{"id": "RESET_PIN", "type": "pin", "value": "RESET", "position": [20, 95], "position_type": "percent"}},
-    {{"id": "V3V3", "type": "pin", "value": "3.3V", "position": [25, 95], "position_type": "percent"}},
-    {{"id": "V5", "type": "pin", "value": "5V", "position": [30, 95], "position_type": "percent"}},
-    {{"id": "GND2", "type": "pin", "value": "GND", "position": [35, 95], "position_type": "percent"}},
-    {{"id": "GND3", "type": "pin", "value": "GND", "position": [40, 95], "position_type": "percent"}},
-    {{"id": "VIN", "type": "pin", "value": "VIN", "position": [45, 95], "position_type": "percent"}},
-    {{"id": "A0", "type": "pin", "value": "A0", "position": [50, 95], "position_type": "percent"}},
-    {{"id": "A1", "type": "pin", "value": "A1", "position": [55, 95], "position_type": "percent"}},
-    {{"id": "A2", "type": "pin", "value": "A2", "position": [60, 95], "position_type": "percent"}},
-    {{"id": "A3", "type": "pin", "value": "A3", "position": [65, 95], "position_type": "percent"}},
-    {{"id": "A4", "type": "pin", "value": "A4/SDA", "position": [70, 95], "position_type": "percent"}},
-    {{"id": "A5", "type": "pin", "value": "A5/SCL", "position": [75, 95], "position_type": "percent"}},
-    {{"id": "ICSP1", "type": "connector", "value": "ICSP", "position": [75, 55], "position_type": "percent"}},
-    {{"id": "ICSP2", "type": "connector", "value": "ICSP", "position": [45, 20], "position_type": "percent"}}
+    // List ONLY components actually visible in the image
+    // Use position_type "percent" with 0,0 = top-left, 100,100 = bottom-right
+    // Example: {{"id": "MCU", "type": "ic", "value": "ATmega328P", "position": [50, 50], "position_type": "percent"}}
   ],
-  "connections": [
-    {{"from": "USB", "to": "USB_MCU"}},
-    {{"from": "USB_MCU", "to": "MCU"}},
-    {{"from": "PWR_JACK", "to": "VIN"}},
-    {{"from": "V5", "to": "MCU"}},
-    {{"from": "D13", "to": "LED_L.anode"}},
-    {{"from": "LED_L.cathode", "to": "GND1"}},
-    {{"from": "RESET", "to": "MCU"}}
-  ],
-  "power": {{"voltage": 5, "source": "USB/VIN"}},
-  "canvas_mode": "arduino",
-  "metadata": {{"name": "Arduino UNO R3", "entry_point": "USB"}}
+  "connections": [],
+  "power": {{"voltage": 5, "source": "USB"}},
+  "canvas_mode": "agent",
+  "metadata": {{
+    "name": "<actual board name you identified>",
+    "board_type": "<uno|nano|mega|esp32|pico|custom>",
+    "entry_point": "USB"
+  }}
 }}
-</circuit>"""
+</circuit>
+
+Component type values: "ic", "connector", "led", "button", "resistor", "capacitor", "crystal", "pin"
+
+Rules:
+- Identify the REAL board from the image — check for board name printed on silkscreen
+- For Arduino Nano: pins run along both long edges, mini-USB connector, smaller form factor
+- For Arduino Uno: larger board, USB-B connector, pins on edges
+- For Arduino Mega: longer board, many more pins
+- Place components at their actual visual positions as percentages
+- Include all visible ICs, connectors, LEDs, buttons, and pin headers
+- Set canvas_mode to "agent" so components render as individual shapes"""
 
         response = ai.messages.create(
             model=MODEL,
