@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import MainLayout from './components/MainLayout'
 import ChatWidget from './components/ChatWidget'
 import LandingPage from './components/LandingPage'
@@ -18,24 +18,32 @@ function getParams() {
   return {
     mode: p.get('mode'),
     chatOpen: p.get('chat') === 'open',
+    uploadPdf: p.get('upload') === 'pdf',
+    autoPlay: p.get('play') === 'true',
+    autoGenerate: p.get('generate') === 'true',
   }
 }
 
 export default function App() {
   const params = getParams()
-  const path = window.location.pathname
-
   const [circuit, setCircuit] = useState(() => ({
     ...EMPTY_CIRCUIT,
     canvas_mode: params.mode === 'manual' ? 'manual' : 'agent',
   }))
-  const [chatExpanded, setChatExpanded] = useState(false)
+  const path = window.location.pathname
 
   if (path === '/app') {
     return (
       <>
-        <MainLayout circuit={circuit} setCircuit={setCircuit} chatExpanded={chatExpanded} setChatExpanded={setChatExpanded} />
-        <ChatWidget circuit={circuit} setCircuit={setCircuit} expanded={chatExpanded} setExpanded={setChatExpanded} initialOpen={params.chatOpen} />
+        <MainLayout
+          circuit={circuit}
+          setCircuit={setCircuit}
+          initialChatOpen={params.chatOpen}
+          initialUploadPdf={params.uploadPdf}
+          initialAutoPlay={params.autoPlay}
+          initialAutoGenerate={params.autoGenerate}
+        />
+        <ChatWidget circuit={circuit} setCircuit={setCircuit} initialOpen={params.chatOpen} />
       </>
     )
   }
