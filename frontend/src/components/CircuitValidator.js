@@ -20,6 +20,9 @@
  */
 export function getComponentPins(type) {
   if (type === 'led') return ['anode', 'cathode']
+  if (type === 'battery_9v' || type === 'battery_coin' || type === 'power_supply') return ['positive', 'negative']
+  if (type === 'transistor_npn' || type === 'transistor_pnp') return ['base', 'collector', 'emitter']
+  if (type === 'mosfet') return ['gate', 'drain', 'source']
   return ['pin1', 'pin2']
 }
 
@@ -39,7 +42,13 @@ export function getComponentPins(type) {
  * @param {Array<{from: string, to: string}>} connections
  * @returns {Map<string, Set<string>>}
  */
-export function buildAdjacencyGraph(components, connections) {
+const POWER_TYPES = new Set(['battery_9v', 'battery_coin', 'power_supply'])
+const POSITIVE_PINS = new Set(['positive', 'anode', 'vcc', 'plus'])
+const NEGATIVE_PINS = new Set(['negative', 'cathode', 'gnd', 'minus'])
+
+const SWITCH_TYPES = new Set(['button', 'switch_slide', 'switch_toggle'])
+
+export function buildAdjacencyGraph(components, connections, interactiveStates = {}) {
   /** @type {Map<string, Set<string>>} */
   const graph = new Map()
 
@@ -53,13 +62,36 @@ export function buildAdjacencyGraph(components, connections) {
   // Internal component pin-to-pin edges
   for (const comp of components) {
     const pins = getComponentPins(comp.type)
-    if (pins.length === 2) {
-      addEdge(`${comp.id}.${pins[0]}`, `${comp.id}.${pins[1]}`)
+    if (pins.length >= 2) {
+      // Switches/buttons: only add internal conduction edge when closed/pressed
+      if (SWITCH_TYPES.has(comp.type)) {
+        const state = interactiveStates[comp.id] ?? {}
+        const closed = comp.type === 'button' ? !!state.pressed : !!state.on
+        if (closed) addEdge(`${comp.id}.${pins[0]}`, `${comp.id}.${pins[1]}`)
+        // Always add the nodes so they appear in the graph
+        if (!graph.has(`${comp.id}.${pins[0]}`)) graph.set(`${comp.id}.${pins[0]}`, new Set())
+        if (!graph.has(`${comp.id}.${pins[1]}`)) graph.set(`${comp.id}.${pins[1]}`, new Set())
+      } else {
+        addEdge(`${comp.id}.${pins[0]}`, `${comp.id}.${pins[1]}`)
+      }
+    }
+    // Power sources: alias positive pin → VCC, negative pin → GND
+    if (POWER_TYPES.has(comp.type)) {
+      addEdge(`${comp.id}.positive`, 'VCC')
+      addEdge(`${comp.id}.negative`, 'GND')
+    }
+    // Arduino boards: alias 5V/3.3V pins → VCC, GND pins → GND
+    if (comp.type === 'arduino_uno' || comp.type === 'arduino_nano') {
+      addEdge(`${comp.id}.5V`, 'VCC')
+      addEdge(`${comp.id}.3.3V`, 'VCC')
+      addEdge(`${comp.id}.GND`, 'GND')
+      addEdge(`${comp.id}.VIN`, 'VCC')
     }
   }
 
   // Connection edges
   for (const conn of connections) {
+    if (!conn || typeof conn !== 'object') continue
     addEdge(conn.from, conn.to)
   }
 
@@ -119,9 +151,9 @@ export function bfs(graph, startNode) {
  *   validPathNodes: Set<string>
  * }}
  */
-export function validateCircuit(components, connections) {
+export function validateCircuit(components, connections, interactiveStates = {}) {
   // Step 1: Build adjacency graph
-  const graph = buildAdjacencyGraph(components, connections)
+  const graph = buildAdjacencyGraph(components, connections, interactiveStates)
 
   // Step 2: BFS from VCC and GND
   const reachableFromVCC = bfs(graph, 'VCC')
@@ -174,22 +206,30 @@ export function validateCircuit(components, connections) {
   }
 
   // Step 5: Check for disconnected components (non-LED)
+  // Build a set of all component IDs that appear in at least one connection
+  const connectedIds = new Set()
+  for (const conn of connections) {
+    if (!conn || typeof conn !== 'object') continue
+    for (const endpoint of [conn.from, conn.to]) {
+      const id = endpoint.split('.')[0]
+      if (id !== 'VCC' && id !== 'GND') connectedIds.add(id)
+    }
+  }
+
+  const SKIP_DISCONNECT_CHECK = new Set(['arduino_uno', 'arduino_nano', 'power_supply', 'battery_9v', 'battery_coin'])
   for (const comp of components) {
     if (comp.type === 'led') continue
-    const pins = getComponentPins(comp.type)
-    const hasAnyConnection = pins.some((pin) => {
-      const node = `${comp.id}.${pin}`
-      // >1 because the internal pin-to-pin edge always exists
-      return graph.has(node) && graph.get(node).size > 1
-    })
-    if (!hasAnyConnection) {
+    if (SKIP_DISCONNECT_CHECK.has(comp.type)) continue
+    if (!connectedIds.has(comp.id)) {
       errors.push(`${comp.id} has no connections`)
     }
   }
 
-  // Step 6: Check overall VCC→GND path
+  // Step 6: Check overall VCC→GND path — skip if an Arduino/power source is present
+  // (Arduino provides its own power via UNO1.5V→VCC alias)
+  const hasPowerSource = components.some(c => POWER_TYPES.has(c.type) || c.type === 'arduino_uno' || c.type === 'arduino_nano')
   const hasCompletePath = validPathNodes.has('VCC') && validPathNodes.has('GND')
-  if (components.length > 0 && !hasCompletePath && errors.length === 0) {
+  if (components.length > 0 && !hasCompletePath && !hasPowerSource && errors.length === 0) {
     errors.push('No complete path from VCC to GND')
   }
 

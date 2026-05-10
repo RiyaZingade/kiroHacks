@@ -13,7 +13,7 @@ const CloseIcon = () => (
   </svg>
 )
 
-export default function ChatWidget({ circuit, setCircuit, expanded, setExpanded, initialOpen = false, projectId }) {
+export default function ChatWidget({ circuit, setCircuit, expanded, setExpanded, initialOpen = false, projectId, messages, setMessages, history, setHistory }) {
   const [open, setOpen] = useState(initialOpen)
 
   if (expanded) return null
@@ -42,7 +42,7 @@ export default function ChatWidget({ circuit, setCircuit, expanded, setExpanded,
             </div>
           </div>
           <div className="flex-1 overflow-hidden">
-            <ChatPanel circuit={circuit} setCircuit={setCircuit} projectId={projectId} />
+            <ChatPanel circuit={circuit} setCircuit={setCircuit} projectId={projectId} messages={messages} setMessages={setMessages} history={history} setHistory={setHistory} />
           </div>
         </div>
       )}

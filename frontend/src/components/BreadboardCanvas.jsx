@@ -11,18 +11,22 @@ import { validateCircuit } from './CircuitValidator'
 // Konva.js breadboard canvas with Agent/Manual mode toggle
 
 const CELL = 20
-const COLS = 40
+const COLS = 80
 const ROWS = 40
-const CANVAS_W = COLS * CELL + CELL * 2
+// Power zone: 8 columns to the left of the grid, visually separated
+const POWER_ZONE_COLS = 8
+const GRID_OFFSET_X = POWER_ZONE_COLS * CELL  // grid starts this many px from left
+const CANVAS_W = (COLS + POWER_ZONE_COLS) * CELL + CELL * 2
 const CANVAS_H = ROWS * CELL + CELL * 2
+
+// Power-supply component types that belong in the power zone
+const POWER_TYPES = new Set(['battery_9v', 'battery_coin', 'power_supply', 'arduino_uno', 'arduino_nano'])
 
 const VCC_ROWS = [0, 1]
 const GND_ROWS = [ROWS - 2, ROWS - 1]
 
 function clampToGrid(col, row, type, rotation = 0) {
   const { width, height } = getRotatedSize(type, rotation)
-  const w = Math.ceil(width)
-  const h = Math.ceil(height)
   const def = getComponentDef(type)
   let minC = 0, maxC = 0, minR = 0, maxR = 0
   for (const [offCol, offRow] of Object.values(def.pins)) {
@@ -35,6 +39,14 @@ function clampToGrid(col, row, type, rotation = 0) {
   }
   const minRow = VCC_ROWS.length
   const maxRow = ROWS - GND_ROWS.length - 1
+
+  if (POWER_TYPES.has(type)) {
+    // Clamp to power zone (negative cols: -POWER_ZONE_COLS to -1)
+    const clampedCol = Math.max(-POWER_ZONE_COLS - minC, Math.min(col, -1 - maxC))
+    const clampedRow = Math.max(0 - minR, Math.min(row, ROWS - 1 - maxR))
+    return [clampedCol, clampedRow]
+  }
+
   const clampedCol = Math.max(0 - minC, Math.min(col, COLS - 1 - maxC))
   const clampedRow = Math.max(minRow - minR, Math.min(row, maxRow - maxR))
   return [clampedCol, clampedRow]
@@ -52,6 +64,11 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
   const [dragPreview, setDragPreview] = useState(null)
   const [playgroundActive, setPlaygroundActive] = useState(false)
   const [validationResult, setValidationResult] = useState(null)
+  const [interactiveStates, setInteractiveStates] = useState({}) // componentId → state
+  // rubber-band multi-select
+  const [selectionRect, setSelectionRect] = useState(null) // {x,y,w,h} during drag
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const selectionStartRef = useRef(null)
   const stageRef = useRef(null)
   const containerRef = useRef(null)
 
@@ -65,23 +82,42 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
     setWiringFrom(null)
   }
 
+  const OPEN_BY_DEFAULT = new Set(['button', 'switch_slide', 'switch_toggle'])
+
   const togglePlaygroundMode = () => {
     if (!playgroundActive) {
-      // Entering playground mode
-      const result = validateCircuit(components, connections)
+      const initStates = {}
+      components.forEach(c => {
+        if (OPEN_BY_DEFAULT.has(c.type)) initStates[c.id] = { pressed: false, on: false }
+      })
+      const result = validateCircuit(components, connections, initStates)
       setValidationResult(result)
+      setInteractiveStates(initStates)
       setPlaygroundActive(true)
       setWiringFrom(null)
       setSelectedComponentId(null)
       setSelectedWireIdx(null)
     } else {
-      // Exiting playground mode
       setPlaygroundActive(false)
       setValidationResult(null)
+      setInteractiveStates({})
     }
   }
 
+  const handleInteract = useCallback((componentId, newState) => {
+    setInteractiveStates(prev => {
+      const updated = { ...prev, [componentId]: { ...(prev[componentId] ?? {}), ...newState } }
+      setValidationResult(validateCircuit(components, connections, updated))
+      return updated
+    })
+  }, [components, connections])
+
   const handleComponentSelect = useCallback((id) => {
+    // If clicking a component that's already in the multi-selection, keep the group
+    setSelectedIds(prev => {
+      if (prev.has(id) && prev.size > 1) return prev
+      return new Set([id])
+    })
     setSelectedComponentId(id)
     setSelectedWireIdx(null)
   }, [])
@@ -89,14 +125,23 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
   const handleComponentMove = useCallback(
     (id, type, rawCol, rawRow, rotation = 0) => {
       const [col, row] = clampToGrid(rawCol, rawRow, type, rotation)
+      const deltaCol = col - (components.find(c => c.id === id)?.position[0] ?? col)
+      const deltaRow = row - (components.find(c => c.id === id)?.position[1] ?? row)
+
       setCircuit((prev) => ({
         ...prev,
-        components: prev.components.map((c) =>
-          c.id === id ? { ...c, position: [col, row] } : c
-        ),
+        components: prev.components.map((c) => {
+          if (c.id === id) return { ...c, position: [col, row] }
+          // move other selected components by the same delta
+          if (selectedIds.has(c.id)) {
+            const [nc, nr] = clampToGrid(c.position[0] + deltaCol, c.position[1] + deltaRow, c.type, c.rotation ?? 0)
+            return { ...c, position: [nc, nr] }
+          }
+          return c
+        }),
       }))
     },
-    [setCircuit]
+    [setCircuit, components, selectedIds]
   )
 
   const handleRotateComponent = useCallback(
@@ -144,32 +189,99 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
 
   useEffect(() => {
     const handleKey = (e) => {
-      if ((e.key === 'Backspace' || e.key === 'Delete') && selectedWireIdx !== null) {
-        e.preventDefault()
-        setCircuit((prev) => ({
-          ...prev,
-          connections: prev.connections.filter((_, i) => i !== selectedWireIdx),
-        }))
-        setSelectedWireIdx(null)
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        // delete multi-selected components
+        if (selectedIds.size > 0) {
+          e.preventDefault()
+          setCircuit((prev) => ({
+            ...prev,
+            components: prev.components.filter((c) => !selectedIds.has(c.id)),
+            connections: prev.connections.filter(
+              (c) => ![...selectedIds].some(id =>
+                c.from.startsWith(id + '.') || c.to.startsWith(id + '.') || c.from === id || c.to === id
+              )
+            ),
+          }))
+          setSelectedIds(new Set())
+          setSelectedComponentId(null)
+          return
+        }
+        if (selectedWireIdx !== null) {
+          e.preventDefault()
+          setCircuit((prev) => ({
+            ...prev,
+            connections: prev.connections.filter((_, i) => i !== selectedWireIdx),
+          }))
+          setSelectedWireIdx(null)
+        }
       }
       if (e.key === 'Escape') {
         setWiringFrom(null)
         setSelectedComponentId(null)
         setSelectedWireIdx(null)
+        setSelectedIds(new Set())
+        setSelectionRect(null)
       }
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [selectedWireIdx, setCircuit])
+  }, [selectedWireIdx, selectedIds, setCircuit])
 
   const handleStageMouseMove = useCallback(
     (e) => {
-      if (!wiringFrom) return
       const stage = e.target.getStage()
       const pos = stage.getPointerPosition()
-      if (pos) setMousePos(pos)
+      if (wiringFrom && pos) setMousePos(pos)
+      if (selectionStartRef.current && pos) {
+        const sx = selectionStartRef.current.x
+        const sy = selectionStartRef.current.y
+        setSelectionRect({
+          x: Math.min(sx, pos.x),
+          y: Math.min(sy, pos.y),
+          w: Math.abs(pos.x - sx),
+          h: Math.abs(pos.y - sy),
+        })
+      }
     },
     [wiringFrom]
+  )
+
+  const handleStageMouseDown = useCallback(
+    (e) => {
+      // only start rubber-band on empty canvas click (not on a component)
+      if (e.target !== e.target.getStage()) return
+      if (wiringFrom) return
+      const stage = e.target.getStage()
+      const pos = stage.getPointerPosition()
+      selectionStartRef.current = pos
+      setSelectionRect(null)
+      setSelectedIds(new Set())
+      setSelectedComponentId(null)
+      setSelectedWireIdx(null)
+    },
+    [wiringFrom]
+  )
+
+  const handleStageMouseUp = useCallback(
+    () => {
+      if (!selectionStartRef.current || !selectionRect) {
+        selectionStartRef.current = null
+        return
+      }
+      selectionStartRef.current = null
+      const { x, y, w, h } = selectionRect
+      if (w < 4 && h < 4) { setSelectionRect(null); return }
+      // find components whose pixel centre falls inside the rect
+      const hit = new Set()
+      components.forEach((c) => {
+        const cx = c.position[0] * CELL + CELL + GRID_OFFSET_X
+        const cy = c.position[1] * CELL + CELL
+        if (cx >= x && cx <= x + w && cy >= y && cy <= y + h) hit.add(c.id)
+      })
+      setSelectedIds(hit)
+      setSelectionRect(null)
+    },
+    [selectionRect, components]
   )
 
   const handleDrop = useCallback(
@@ -185,7 +297,8 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
       const rect = stageContainer.getBoundingClientRect()
       const dropX = e.clientX - rect.left
       const dropY = e.clientY - rect.top
-      const rawCol = Math.round((dropX - CELL) / CELL)
+      // Subtract GRID_OFFSET_X so col=0 aligns with the grid start; power zone gets negative cols
+      const rawCol = Math.round((dropX - CELL - GRID_OFFSET_X) / CELL)
       const rawRow = Math.round((dropY - CELL) / CELL)
       const [col, row] = clampToGrid(rawCol, rawRow, type)
       const id = generateId(type, components)
@@ -211,7 +324,7 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
       const rect = stageContainer.getBoundingClientRect()
       const hoverX = e.clientX - rect.left
       const hoverY = e.clientY - rect.top
-      const rawCol = Math.round((hoverX - CELL) / CELL)
+      const rawCol = Math.round((hoverX - CELL - GRID_OFFSET_X) / CELL)
       const rawRow = Math.round((hoverY - CELL) / CELL)
       const dragType = getCurrentDragType()
       if (dragType) {
@@ -337,6 +450,11 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
             )}
           </div>
         )}
+        {selectedIds.size > 1 && (
+          <span className="text-xs text-blue-400">
+            {selectedIds.size} selected — drag to move · Delete to remove
+          </span>
+        )}
         {wiringFrom && (
           <span className="text-xs text-yellow-400 animate-pulse">
             Wiring: click a target pin (Esc to cancel)
@@ -390,16 +508,96 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
             width={CANVAS_W}
             height={CANVAS_H}
             onMouseMove={handleStageMouseMove}
+            onMouseDown={handleStageMouseDown}
+            onMouseUp={handleStageMouseUp}
             onClick={(e) => {
               if (e.target === e.target.getStage()) {
                 setSelectedComponentId(null)
                 setSelectedWireIdx(null)
+                if (!selectionRect) setSelectedIds(new Set())
               }
             }}
           >
             <Layer>
+              {/* Power zone background */}
               <Rect
-                x={CELL}
+                x={0}
+                y={0}
+                width={GRID_OFFSET_X + CELL}
+                height={CANVAS_H}
+                fill="#1a1a2e"
+                listening={false}
+              />
+              <Line
+                points={[GRID_OFFSET_X + CELL, 0, GRID_OFFSET_X + CELL, CANVAS_H]}
+                stroke="#374151"
+                strokeWidth={1}
+                dash={[4, 4]}
+                listening={false}
+              />
+              {/* Power zone label */}
+              <Text
+                x={4}
+                y={12}
+                text="POWER"
+                fontSize={8}
+                fill="#4b5563"
+                fontStyle="bold"
+                letterSpacing={1}
+                width={GRID_OFFSET_X}
+                align="center"
+                listening={false}
+              />
+              {/* Empty-state prompt when no power source is in the zone */}
+              {!components.some(c => POWER_TYPES.has(c.type)) && (
+                <>
+                  <Rect
+                    x={6}
+                    y={CANVAS_H / 2 - 48}
+                    width={GRID_OFFSET_X - 12}
+                    height={96}
+                    fill="#f59e0b10"
+                    stroke="#f59e0b40"
+                    strokeWidth={1}
+                    cornerRadius={4}
+                    dash={[3, 3]}
+                    listening={false}
+                  />
+                  <Text
+                    x={6}
+                    y={CANVAS_H / 2 - 36}
+                    text="⚡"
+                    fontSize={18}
+                    align="center"
+                    width={GRID_OFFSET_X - 12}
+                    listening={false}
+                  />
+                  <Text
+                    x={6}
+                    y={CANVAS_H / 2 - 12}
+                    text={"No power\nsource"}
+                    fontSize={9}
+                    fill="#f59e0b"
+                    align="center"
+                    width={GRID_OFFSET_X - 12}
+                    listening={false}
+                  />
+                  <Text
+                    x={6}
+                    y={CANVAS_H / 2 + 16}
+                    text={"Drag a battery\nor Arduino here"}
+                    fontSize={8}
+                    fill="#6b7280"
+                    align="center"
+                    width={GRID_OFFSET_X - 12}
+                    listening={false}
+                  />
+                </>
+              )}
+
+              {/* Breadboard grid rails */}
+              <Rect
+                x={CELL + GRID_OFFSET_X}
                 y={CELL * (VCC_ROWS[0] + 1)}
                 width={(COLS - 1) * CELL}
                 height={CELL * VCC_ROWS.length}
@@ -407,7 +605,7 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
                 cornerRadius={2}
               />
               <Text
-                x={4}
+                x={GRID_OFFSET_X + 4}
                 y={CELL * (VCC_ROWS[0] + 1) + 4}
                 text="+"
                 fontSize={12}
@@ -415,7 +613,7 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
                 fontStyle="bold"
               />
               <Rect
-                x={CELL}
+                x={CELL + GRID_OFFSET_X}
                 y={CELL * (GND_ROWS[0] + 1)}
                 width={(COLS - 1) * CELL}
                 height={CELL * GND_ROWS.length}
@@ -423,7 +621,7 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
                 cornerRadius={2}
               />
               <Text
-                x={4}
+                x={GRID_OFFSET_X + 4}
                 y={CELL * (GND_ROWS[0] + 1) + 4}
                 text="−"
                 fontSize={12}
@@ -441,7 +639,7 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
                   return (
                     <Circle
                       key={`${row}-${col}`}
-                      x={col * CELL + CELL}
+                      x={col * CELL + CELL + GRID_OFFSET_X}
                       y={row * CELL + CELL}
                       radius={2}
                       fill={fill}
@@ -473,7 +671,7 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
                 const def = getComponentDef(dragPreview.type)
                 const pw = Math.ceil(def.width) * CELL
                 const ph = Math.ceil(def.height) * CELL
-                const px = dragPreview.col * CELL + CELL
+                const px = dragPreview.col * CELL + CELL + GRID_OFFSET_X
                 const py = dragPreview.row * CELL + CELL
                 const previewComponent = {
                   id: '~preview',
@@ -513,15 +711,33 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
                 <ComponentRenderer
                   key={c.id}
                   component={c}
-                  isSelected={selectedComponentId === c.id}
+                  isSelected={selectedComponentId === c.id || selectedIds.has(c.id)}
                   selectedPin={wiringFrom}
                   onSelect={handleComponentSelect}
                   onPinClick={handlePinClick}
                   onMove={handleComponentMove}
                   mode={playgroundActive ? 'agent' : mode}
                   isLit={playgroundActive && validationResult?.ledStates?.get(c.id) === true}
+                  isPlayground={playgroundActive}
+                  interactiveState={interactiveStates[c.id]}
+                  onInteract={handleInteract}
                 />
               ))}
+
+              {/* rubber-band selection rect */}
+              {selectionRect && selectionRect.w > 2 && selectionRect.h > 2 && (
+                <Rect
+                  x={selectionRect.x}
+                  y={selectionRect.y}
+                  width={selectionRect.w}
+                  height={selectionRect.h}
+                  fill="#3b82f615"
+                  stroke="#3b82f6"
+                  strokeWidth={1}
+                  dash={[4, 3]}
+                  listening={false}
+                />
+              )}
             </Layer>
 
             {/* P4: Current flow animation layer */}
@@ -529,7 +745,7 @@ export default function BreadboardCanvas({ circuit, setCircuit, playing, resetCo
           </Stage>
         </div>
 
-        {selectedComponent && (
+        {selectedComponent && !playgroundActive && (
           <ComponentInspector
             component={selectedComponent}
             onUpdateValue={handleUpdateValue}

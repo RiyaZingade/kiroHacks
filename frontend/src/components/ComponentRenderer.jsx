@@ -124,6 +124,8 @@ export function getRotatedSize(type, rotation = 0) {
 
 // Resolve a pin's absolute pixel position given a component (with rotation)
 // Adds CELL offset to match the grid padding (grid dots start at CELL, not 0)
+// GRID_OFFSET_X accounts for the power zone columns to the left of the breadboard
+const GRID_OFFSET_X = 8 * CELL  // must match BreadboardCanvas.jsx POWER_ZONE_COLS * CELL
 export function getPinPosition(component) {
   const def = getComponentDef(component.type)
   const [col, row] = component.position
@@ -132,7 +134,7 @@ export function getPinPosition(component) {
   for (const [pinName, [offCol, offRow]] of Object.entries(def.pins)) {
     const [rCol, rRow] = rotateOffset(offCol, offRow, rotation)
     result[pinName] = {
-      x: (col + rCol) * CELL + CELL,
+      x: (col + rCol) * CELL + CELL + GRID_OFFSET_X,
       y: (row + rRow) * CELL + CELL,
     }
   }
@@ -178,10 +180,13 @@ export default function ComponentRenderer({
   onMove,
   mode,
   isLit,
+  isPlayground,
+  interactiveState,  // { pressed } for button, { on } for switch, { key } for keypad
+  onInteract,        // (componentId, newState) => void
 }) {
   const def = getComponentDef(component.type)
   const [col, row] = component.position
-  const x = col * CELL + CELL
+  const x = col * CELL + CELL + GRID_OFFSET_X
   const y = row * CELL + CELL
   const w = def.width * CELL
   const h = def.height * CELL
@@ -222,7 +227,8 @@ export default function ComponentRenderer({
         // Vertical 1×3: dome-shaped LED with two pin legs
         {
           const ledColor = fillColor
-          const dimColor = fillColor + '60'
+          // In playground: off = very dark, on = bright with glow
+          const bodyOpacity = isPlayground ? (isLit ? 1.0 : 0.15) : 0.9
           return (
             <>
               {/* Pin legs */}
@@ -237,30 +243,32 @@ export default function ComponentRenderer({
                 width={CELL - 4}
                 height={4}
                 fill={ledColor}
-                opacity={0.8}
+                opacity={bodyOpacity}
               />
               {/* LED dome body */}
               <Circle
                 x={0}
                 y={CELL * 0.9}
                 radius={halfCell - 1}
-                fill={ledColor}
+                fill={isPlayground && !isLit ? '#1f2937' : ledColor}
                 stroke={isSelected ? '#facc15' : '#ffffff30'}
                 strokeWidth={isSelected ? 2 : 1}
-                opacity={isLit ? 1.0 : 0.9}
+                opacity={bodyOpacity}
                 shadowColor={isLit ? fillColor : undefined}
-                shadowBlur={isLit ? 20 : 0}
-                shadowOpacity={isLit ? 0.8 : 0}
+                shadowBlur={isLit ? 24 : 0}
+                shadowOpacity={isLit ? 0.9 : 0}
               />
-              {/* Inner glow highlight */}
-              <Circle
-                x={-2}
-                y={CELL * 0.75}
-                radius={3}
-                fill="#ffffff"
-                opacity={0.35}
-                listening={false}
-              />
+              {/* Inner glow highlight — only when lit */}
+              {(!isPlayground || isLit) && (
+                <Circle
+                  x={-2}
+                  y={CELL * 0.75}
+                  radius={3}
+                  fill="#ffffff"
+                  opacity={0.35}
+                  listening={false}
+                />
+              )}
               {/* Cathode pin at bottom */}
               <Line points={[-3, CELL * 1.5, -3, CELL * 2]} stroke="#9ca3af" strokeWidth={1.5} />
               <Line points={[3, CELL * 1.5, 3, CELL * 2]} stroke="#9ca3af" strokeWidth={1.5} />
@@ -323,12 +331,12 @@ export default function ComponentRenderer({
               stroke={isSelected ? '#facc15' : '#6b7280'}
               strokeWidth={isSelected ? 2 : 1.5}
             />
-            {/* Button cap */}
+            {/* Button cap — depressed when pressed in playground */}
             <Circle
               x={CELL}
-              y={0}
+              y={interactiveState?.pressed ? 1 : 0}
               radius={halfCell - 4}
-              fill="#9ca3af"
+              fill={interactiveState?.pressed ? '#6b7280' : '#9ca3af'}
               stroke="#d1d5db"
               strokeWidth={1}
             />
@@ -710,11 +718,12 @@ export default function ComponentRenderer({
       case 'switch_toggle':
         {
           const sw = def.width * CELL
+          const switchOn = interactiveState?.on ?? false
           return (
             <>
-              <Rect x={CELL * 0.2} y={-CELL / 2} width={sw - CELL * 0.4} height={CELL} fill="#3f3f46" stroke={isSelected ? '#facc15' : '#71717a'} strokeWidth={isSelected ? 2 : 1} cornerRadius={CELL / 2} />
-              {/* Slider knob */}
-              <Circle x={CELL} y={0} radius={CELL / 2 - 2} fill="#a1a1aa" stroke="#d4d4d8" strokeWidth={1} />
+              <Rect x={CELL * 0.2} y={-CELL / 2} width={sw - CELL * 0.4} height={CELL} fill={switchOn ? '#166534' : '#3f3f46'} stroke={isSelected ? '#facc15' : (switchOn ? '#22c55e' : '#71717a')} strokeWidth={isSelected ? 2 : 1} cornerRadius={CELL / 2} />
+              {/* Slider knob — moves right when on */}
+              <Circle x={switchOn ? sw - CELL : CELL} y={0} radius={CELL / 2 - 2} fill="#a1a1aa" stroke="#d4d4d8" strokeWidth={1} />
               <Line points={[0, 0, CELL * 0.2, 0]} stroke="#c0c0c0" strokeWidth={1.5} />
               <Line points={[sw - CELL * 0.2, 0, sw, 0]} stroke="#c0c0c0" strokeWidth={1.5} />
             </>
@@ -832,28 +841,54 @@ export default function ComponentRenderer({
     })
   }
 
+  const INTERACTIVE_TYPES = new Set(['button', 'switch_slide', 'switch_toggle', 'potentiometer', 'keypad'])
+  const isInteractive = isPlayground && INTERACTIVE_TYPES.has(component.type)
+
+  function handlePlaygroundClick() {
+    if (!onInteract) return
+    const t = component.type
+    if (t === 'switch_slide' || t === 'switch_toggle') {
+      onInteract(component.id, { on: !(interactiveState?.on ?? false) })
+    }
+    // button is handled via mousedown/up; keypad via individual key clicks
+  }
+
   return (
     <Group
       x={x}
       y={y}
       rotation={rotation}
-      draggable={isDraggable}
+      draggable={isDraggable && !isPlayground}
       onDragEnd={(e) => {
-        if (!onMove) return
+        if (!onMove || isPlayground) return
         const node = e.target
-        const newCol = Math.round((node.x() - CELL) / CELL)
+        const newCol = Math.round((node.x() - CELL - GRID_OFFSET_X) / CELL)
         const newRow = Math.round((node.y() - CELL) / CELL)
         onMove(component.id, component.type, newCol, newRow, component.rotation)
         node.position({ x, y })
       }}
-      onClick={() => onSelect && onSelect(component.id)}
-      onMouseEnter={(e) => {
-        const container = e.target.getStage().container()
-        container.style.cursor = isDraggable ? 'grab' : 'pointer'
+      onClick={() => {
+        if (isPlayground) { handlePlaygroundClick(); return }
+        onSelect && onSelect(component.id)
+      }}
+      onMouseDown={() => {
+        if (isPlayground && component.type === 'button' && onInteract)
+          onInteract(component.id, { pressed: true })
+      }}
+      onMouseUp={() => {
+        if (isPlayground && component.type === 'button' && onInteract)
+          onInteract(component.id, { pressed: false })
       }}
       onMouseLeave={(e) => {
+        // Release button if mouse leaves while held
+        if (isPlayground && component.type === 'button' && interactiveState?.pressed && onInteract)
+          onInteract(component.id, { pressed: false })
+        const container = e.target.getStage()?.container()
+        if (container) container.style.cursor = 'default'
+      }}
+      onMouseEnter={(e) => {
         const container = e.target.getStage().container()
-        container.style.cursor = 'default'
+        container.style.cursor = isInteractive ? 'pointer' : isDraggable ? 'grab' : 'pointer'
       }}
     >
       {renderShape()}

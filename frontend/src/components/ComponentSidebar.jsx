@@ -103,9 +103,16 @@ function CompIcon({ type }) {
   )
 }
 
+const ALL_TYPES = CATEGORIES.flatMap(c => c.types)
+
 export default function ComponentSidebar({ mode }) {
   const isManual = mode === 'manual'
   const [openCats, setOpenCats] = useState(() => new Set(CATEGORIES.map(c => c.name)))
+  const [query, setQuery] = useState('')
+
+  const suggestions = query.trim().length > 0
+    ? ALL_TYPES.filter(ct => ct.label.toLowerCase().includes(query.toLowerCase()))
+    : []
 
   const toggle = (name) => {
     setOpenCats(prev => {
@@ -134,8 +141,37 @@ export default function ComponentSidebar({ mode }) {
     }`}>
       <div className="sticky top-0 bg-gray-950 z-10 px-2 pt-2 pb-1">
         <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Components</span>
+        <div className="relative mt-1">
+          <input
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search components…"
+            className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-[11px] text-gray-200 placeholder-gray-600 focus:outline-none focus:border-amber-500"
+          />
+        </div>
       </div>
-      {CATEGORIES.map((cat) => (
+      {query.trim().length > 0 && suggestions.length > 0 && (
+        <div className="flex flex-col gap-0.5 px-1 pb-1 pt-1">
+          {suggestions.map((ct) => (
+            <div
+              key={ct.type}
+              draggable={isManual}
+              onDragStart={(e) => handleDragStart(e, ct)}
+              className={`flex items-center gap-2 px-2 py-1 rounded text-xs transition-colors ${
+                isManual ? 'text-gray-300 hover:bg-gray-800 cursor-grab active:cursor-grabbing' : 'text-gray-500'
+              }`}
+            >
+              <CompIcon type={ct.type} />
+              <span className="truncate">{ct.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {query.trim().length > 0 && suggestions.length === 0 && (
+        <p className="text-[10px] text-gray-600 px-2 py-2">No components found</p>
+      )}
+      {query.trim().length === 0 && CATEGORIES.map((cat) => (
         <div key={cat.name}>
           <button
             onClick={() => toggle(cat.name)}

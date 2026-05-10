@@ -363,11 +363,34 @@ resistor, led, capacitor, button, power_supply, battery_9v, battery_coin, capaci
 - Connections between components go ONLY in the "connections" array: { "from": "COMP_ID.pinName", "to": "COMP_ID.pinName" }
 - This is the ONLY way wires are drawn on the canvas. There is no other mechanism.
 - Every component MUST appear in at least 2 connections (one for power/signal in, one for power/signal out or GND).
-- Use VCC and GND as endpoints: { "from": "VCC", "to": "R1.pin1" }, { "from": "LED1.cathode", "to": "GND" }
 - Always add a current-limiting resistor in series before any LED.
 
+## Circuit Topology Rules (CRITICAL)
+Apply these physics rules on every circuit you generate:
+
+**Closed loop**: Current only flows in a complete loop. Every circuit MUST have an unbroken path from power(+) through all components back to power(−). A component with no return path does nothing.
+
+**No short circuits**: Never connect a wire directly from (+) to (−) bypassing components. Never create a path that skips a component that should be in series.
+
+**No accidental parallel paths**: Unless the design explicitly calls for parallel branches, wire everything in series — one path only. A second unintended path is a short circuit or bypass.
+
+**Series vs parallel — be deliberate**:
+- Series: same current through every component, voltage divides. Use for: resistor + LED, button + LED, etc.
+- Parallel: same voltage across each branch, current splits. Only use when explicitly requested.
+
+**Polarity**: LEDs, capacitors, and batteries have polarity. LED anode → higher potential, cathode → GND. Never reverse them.
+
+**Always limit current**: Never connect an LED (or any low-resistance component) directly to a power source without a series resistor. Use 220Ω–1kΩ for 5V, 330Ω–2kΩ for 9V.
+
+**KVL check**: Voltages around any loop must sum to zero. If your source is 9V, the resistor + LED must drop ~9V total.
+
+**KCL check**: Current into any junction equals current out. If you have a junction, both branches must eventually reconnect to complete their loops.
+
 ## Layout Rules
-- Positions are [col, row] on a 40x30 grid. Space components at least 4 columns/rows apart.
+- Positions are [col, row] on a 80×30 grid. Space components at least 4 columns/rows apart.
+- **Power zone**: batteries, power supplies, Arduino Uno/Nano MUST use NEGATIVE col values (e.g. [-6, 5]). This places them in the dedicated power zone to the left of the breadboard. All other components use positive cols (0–39).
+- Example power zone positions: battery at [-6, 5], Arduino Uno at [-7, 10].
+- Wire from the power source to the breadboard using connections: e.g. {"from": "BAT1.positive", "to": "VCC"}, {"from": "BAT1.negative", "to": "GND"}.
 - Keep circuits to max 10 components.
 - Leave code.source as empty string — do not generate code in the circuit JSON.
 
@@ -390,7 +413,10 @@ def parse_response(text: str):
     if not circuit_match:
         circuit_match = re.search(r"<circuit>(.*)", text, re.DOTALL)
 
-    reply = reply_match.group(1).strip() if reply_match else text.strip()
+    reply = reply_match.group(1).strip() if reply_match else re.sub(r"<circuit>.*?</circuit>", "", text, flags=re.DOTALL).strip()
+    # Also strip any leftover open-ended <circuit> tag
+    if not reply_match:
+        reply = re.sub(r"<circuit>.*", "", reply, flags=re.DOTALL).strip()
     circuit = None
 
     if circuit_match:
@@ -447,10 +473,29 @@ def has_floating_components(circuit: dict) -> list[str]:
         return []
     connected_ids = set()
     for conn in connections:
+        if not isinstance(conn, dict):
+            continue
         for endpoint in [conn.get("from", ""), conn.get("to", "")]:
             if "." in endpoint:
                 connected_ids.add(endpoint.split(".")[0])
     return [c["id"] for c in components if c["id"] not in connected_ids]
+
+
+def build_floating_fix_prompt(floating: list[str], circuit: dict) -> str:
+    """Build a very explicit fix prompt showing exactly what connections are missing."""
+    lines = [
+        f"STOP. The circuit is broken. These components have NO connections at all: {', '.join(floating)}.",
+        "You MUST fix this RIGHT NOW by outputting a complete corrected circuit JSON.",
+        "",
+        "Rules you must follow:",
+        "- Every component needs at least 2 connections (one in, one out).",
+        "- Current must flow in a single series loop: power(+) → comp1 → comp2 → ... → power(−).",
+        "- LED: anode connects toward power, cathode connects toward GND.",
+        "- Always put a resistor in series before any LED.",
+        "",
+        "Output the COMPLETE corrected circuit JSON now inside <circuit>...</circuit> tags. Do not explain. Just fix it.",
+    ]
+    return "\n".join(lines)
 
 
 app = FastAPI(title="CirKit API")
@@ -516,10 +561,9 @@ async def chat(req: ChatRequest):
 
         floating = has_floating_components(circuit)
         if floating:
-            # Some components have no connections — ask for a fix
             if attempt < 2:
                 messages.append({"role": "assistant", "content": raw})
-                messages.append({"role": "user", "content": f"These components are floating (no connections): {', '.join(floating)}. Output the complete circuit JSON again with ALL components properly wired in the connections array."})
+                messages.append({"role": "user", "content": build_floating_fix_prompt(floating, circuit)})
             continue
 
         # Valid circuit — done
@@ -547,7 +591,7 @@ Extracted text from the PDF:
 
 {component_specs}
 
-Analyze this and generate a circuit JSON. Use the component specs above (if any) to set accurate values, types, and descriptions. You MUST respond in this exact format:
+Analyze this and generate a circuit JSON. You MUST respond in this exact format:
 
 <reply>
 Brief description of what you found and built.
@@ -558,8 +602,8 @@ Brief description of what you found and built.
 
 The circuit JSON must follow this schema:
 {{
-  "components": [{{"id": "R1", "type": "resistor|led|capacitor|button|wire|power_rail", "value": "optional", "color": "optional", "position": [col, row]}}],
-  "connections": [{{"from": "VCC|GND|<id>.pin1|<id>.anode|etc", "to": "<id>.pin1|etc"}}],
+  "components": [{{"id": "R1", "type": "resistor", "value": "330Ω", "position": [col, row]}}],
+  "connections": [{{"from": "VCC", "to": "R1.pin1"}}, {{"from": "R1.pin2", "to": "LED1.anode"}}, {{"from": "LED1.cathode", "to": "GND"}}],
   "power": {{"voltage": 5, "source": "VCC"}},
   "code": {{"language": "arduino", "source": "", "origin": "agent"}},
   "run_instructions": {{"power_requirements": "", "wiring_steps": [], "software_setup": "", "safety_flags": []}},
@@ -567,10 +611,23 @@ The circuit JSON must follow this schema:
   "metadata": {{"name": "circuit name", "entry_point": "B"}}
 }}
 
+COMPONENT TYPES — use ONLY these exact strings:
+resistor, led, capacitor, button, battery_9v, battery_coin, power_supply, capacitor_elec, inductor, potentiometer, photoresistor, thermistor, switch_slide, switch_toggle, keypad, led_rgb, display_7seg, lcd_16x2, buzzer, motor_dc, servo, motor_stepper, arduino_uno, arduino_nano, ic_555, ic_shift_reg, ic_logic_and, ic_logic_or, ic_logic_not, ic_opamp, sensor_ultrasonic, sensor_pir, sensor_temp, sensor_light, sensor_tilt, sensor_hall, voltage_reg, transistor_npn, transistor_pnp, mosfet, relay, hbridge, ir_receiver
+
+PIN NAMES per type:
+- resistor: pin1, pin2
+- led: anode, cathode
+- capacitor / capacitor_elec: positive, negative
+- battery_9v / battery_coin / power_supply: positive, negative
+- button: pin1, pin2
+- transistor_npn / transistor_pnp: base, collector, emitter
+- mosfet: gate, drain, source
+
 Rules:
-- positions are [col, row] integers on a 40x30 grid, space components at least 2 apart
-- always include VCC and GND connections
-- always add a current-limiting resistor before any LED
+- positions are [col, row] integers on a 40x30 grid, space components at least 4 apart
+- Every connection MUST use ComponentId.pinName format (never bare IDs)
+- Always connect power through the full circuit back to ground
+- Always add a current-limiting resistor before any LED
 
 If the PDF contains no parseable circuit information, respond with ONLY:
 <reply>
@@ -1191,46 +1248,46 @@ async def upload_pdf(file: UploadFile = File(...), circuit_id: str | None = None
         img = Image.open(io.BytesIO(images[0]))
         img_width, img_height = img.size
         
-        vision_prompt = f"""You are analyzing a circuit board schematic image. Your job is to identify what board this actually is and extract its real components.
-
-IMPORTANT: Do NOT assume this is an Arduino UNO. Look at the image carefully and identify:
-1. The actual board name/model (Arduino Nano, Uno, Mega, ESP32, Raspberry Pi Pico, custom board, etc.)
-2. The actual components visible on the board
-3. The actual pin layout for that specific board
+        vision_prompt = f"""You are analyzing a circuit schematic image. Extract all components and their connections.
 
 Respond in this exact format:
 
 <reply>
-Brief description of what board you identified and what components you found.
+Brief description of what you found.
 </reply>
 <circuit>
 {{
   "components": [
-    // List ONLY components actually visible in the image
     // Use position_type "percent" with 0,0 = top-left, 100,100 = bottom-right
-    // Example: {{"id": "MCU", "type": "ic", "value": "ATmega328P", "position": [50, 50], "position_type": "percent"}}
+    // Example: {{"id": "R1", "type": "resistor", "value": "330\u03a9", "position": [50, 30], "position_type": "percent"}}
   ],
-  "connections": [],
-  "power": {{"voltage": 5, "source": "USB"}},
+  "connections": [
+    // MUST use pin-qualified IDs: "R1.pin1", "LED1.anode", "BAT1.positive"
+    // Use VCC and GND as power rail endpoints
+    // Example: {{"from": "BAT1.positive", "to": "R1.pin1"}}, {{"from": "R1.pin2", "to": "LED1.anode"}}, {{"from": "LED1.cathode", "to": "BAT1.negative"}}
+  ],
+  "power": {{"voltage": 5, "source": "VCC"}},
   "canvas_mode": "agent",
-  "metadata": {{
-    "name": "<actual board name you identified>",
-    "board_type": "<uno|nano|mega|esp32|pico|custom>",
-    "entry_point": "USB"
-  }}
+  "metadata": {{"name": "Uploaded Circuit", "entry_point": "B"}}
 }}
 </circuit>
 
-Component type values: "ic", "connector", "led", "button", "resistor", "capacitor", "crystal", "pin"
+COMPONENT TYPES — use ONLY these exact strings:
+resistor, led, capacitor, button, battery_9v, battery_coin, power_supply, capacitor_elec, inductor, potentiometer, photoresistor, thermistor, switch_slide, switch_toggle, keypad, led_rgb, display_7seg, lcd_16x2, buzzer, motor_dc, servo, motor_stepper, arduino_uno, arduino_nano, ic_555, ic_shift_reg, ic_logic_and, ic_logic_or, ic_logic_not, ic_opamp, sensor_ultrasonic, sensor_pir, sensor_temp, sensor_light, sensor_tilt, sensor_hall, voltage_reg, transistor_npn, transistor_pnp, mosfet, relay, hbridge, ir_receiver
+
+PIN NAMES per type:
+- resistor: pin1, pin2
+- led: anode, cathode
+- capacitor / capacitor_elec: positive, negative
+- battery_9v / battery_coin / power_supply: positive, negative
+- button: pin1, pin2
+- transistor_npn / transistor_pnp: base, collector, emitter
+- mosfet: gate, drain, source
 
 Rules:
-- Identify the REAL board from the image — check for board name printed on silkscreen
-- For Arduino Nano: pins run along both long edges, mini-USB connector, smaller form factor
-- For Arduino Uno: larger board, USB-B connector, pins on edges
-- For Arduino Mega: longer board, many more pins
-- Place components at their actual visual positions as percentages
-- Include all visible ICs, connectors, LEDs, buttons, and pin headers
-- Set canvas_mode to "agent" so components render as individual shapes"""
+- Every connection MUST use ComponentId.pinName format (never bare component IDs)
+- Connect all components into a complete circuit
+- Add a resistor before any LED"""
 
         response = ai.messages.create(
             model=MODEL,
@@ -1354,6 +1411,8 @@ def validate_circuit_data(circuit: dict) -> dict:
     # Check connections reference known component IDs
     known_ids = set(ids) | {"VCC", "GND"}
     for conn in connections:
+        if not isinstance(conn, dict):
+            continue
         for endpoint in [conn.get("from", ""), conn.get("to", "")]:
             base_id = endpoint.split(".")[0]
             if base_id not in known_ids:

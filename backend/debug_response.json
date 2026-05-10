@@ -1,50 +1,251 @@
 RAW RESPONSE:
 <reply>
-This is an Arduino Nano v3.3 schematic. I can see the board name "NanoV3.3" in the bottom right corner. The schematic shows the characteristic Arduino Nano layout with pins along both long edges, a mini-USB connector, the ATmega328P microcontroller, FT232RL USB-to-serial chip, voltage regulator, crystal oscillator, and various support components like LEDs, resistors, and capacitors.
+This is a three-stage RF amplifier circuit using 2N1141 transistors. The circuit has an input on the left, three identical amplifier stages in the middle, and an output on the right. Each stage includes bias resistors, coupling capacitors, inductors for tuning, and RFC (Radio Frequency Choke) inductors in the collector circuits. The circuit is powered by -25V and includes various capacitor values for coupling and bypassing.
 </reply>
 
 <circuit>
 {
   "components": [
-    {"id": "U3", "type": "ic", "value": "ATmega328P", "position": [50, 50], "position_type": "percent"},
-    {"id": "U1", "type": "ic", "value": "FT232RL", "position": [70, 50], "position_type": "percent"},
-    {"id": "U2", "type": "ic", "value": "AMS1117", "position": [25, 65], "position_type": "percent"},
-    {"id": "USB1", "type": "connector", "value": "USB Mini", "position": [75, 30], "position_type": "percent"},
-    {"id": "ICSP1", "type": "connector", "value": "ICSP", "position": [65, 75], "position_type": "percent"},
-    {"id": "X1", "type": "crystal", "value": "16MHz", "position": [45, 65], "position_type": "percent"},
-    {"id": "LED1", "type": "led", "value": "Power LED", "position": [80, 45], "position_type": "percent"},
-    {"id": "LED2", "type": "led", "value": "Pin 13 LED", "position": [55, 35], "position_type": "percent"},
-    {"id": "SW1", "type": "button", "value": "Reset", "position": [35, 45], "position_type": "percent"},
-    {"id": "J1", "type": "connector", "value": "Digital Pins", "position": [15, 40], "position_type": "percent"},
-    {"id": "J2", "type": "connector", "value": "Analog Pins", "position": [85, 60], "position_type": "percent"},
-    {"id": "R1", "type": "resistor", "value": "1k", "position": [52, 40], "position_type": "percent"},
-    {"id": "R2", "type": "resistor", "value": "1k", "position": [77, 42], "position_type": "percent"},
-    {"id": "C1", "type": "capacitor", "value": "100nF", "position": [42, 70], "position_type": "percent"},
-    {"id": "C2", "type": "capacitor", "value": "100nF", "position": [48, 70], "position_type": "percent"},
-    {"id": "C3", "type": "capacitor", "value": "22pF", "position": [43, 62], "position_type": "percent"},
-    {"id": "C4", "type": "capacitor", "value": "22pF", "position": [47, 62], "position_type": "percent"}
+    {"id": "C1", "type": "capacitor", "value": "68pF", "position": [12, 45], "position_type": "percent"},
+    {"id": "L1", "type": "inductor", "value": "10nH", "position": [18, 55], "position_type": "percent"},
+    {"id": "Q1", "type": "transistor_npn", "value": "2N1141", "position": [25, 50], "position_type": "percent"},
+    {"id": "C2", "type": "capacitor", "value": "4-30pF", "position": [22, 40], "position_type": "percent"},
+    {"id": "R1", "type": "resistor", "value": "500Ω", "position": [22, 65], "position_type": "percent"},
+    {"id": "C3", "type": "capacitor", "value": "1000pF", "position": [28, 70], "position_type": "percent"},
+    {"id": "R2", "type": "resistor", "value": "4kΩ", "position": [15, 75], "position_type": "percent"},
+    {"id": "R3", "type": "resistor", "value": "820Ω", "position": [25, 75], "position_type": "percent"},
+    {"id": "C4", "type": "capacitor", "value": "2nF", "position": [15, 85], "position_type": "percent"},
+    {"id": "L2", "type": "inductor", "value": "100μH RFC", "position": [25, 85], "position_type": "percent"},
+    
+    {"id": "C5", "type": "capacitor", "value": "4-30pF", "position": [40, 40], "position_type": "percent"},
+    {"id": "L3", "type": "inductor", "value": "80nH", "position": [40, 55], "position_type": "percent"},
+    {"id": "C6", "type": "capacitor", "value": "1000pF", "position": [45, 50], "position_type": "percent"},
+    {"id": "Q2", "type": "transistor_npn", "value": "2N1141", "position": [50, 50], "position_type": "percent"},
+    {"id": "R4", "type": "resistor", "value": "500Ω", "position": [45, 65], "position_type": "percent"},
+    {"id": "C7", "type": "capacitor", "value": "1000pF", "position": [55, 70], "position_type": "percent"},
+    {"id": "R5", "type": "resistor", "value": "4kΩ", "position": [40, 75], "position_type": "percent"},
+    {"id": "R6", "type": "resistor", "value": "820Ω", "position": [50, 75], "position_type": "percent"},
+    {"id": "C8", "type": "capacitor", "value": "2nF", "position": [40, 85], "position_type": "percent"},
+    {"id": "L4", "type": "inductor", "value": "100μH RFC", "position": [50, 85], "position_type": "percent"},
+    
+    {"id": "C9", "type": "capacitor", "value": "4-30pF", "position": [65, 40], "position_type": "percent"},
+    {"id": "L5", "type": "inductor", "value": "80nH", "position": [65, 55], "position_type": "percent"},
+    {"id": "C10", "type": "capacitor", "value": "1000pF", "position": [70, 50], "position_type": "percent"},
+    {"id": "Q3", "type": "transistor_npn", "value": "2N1141", "position": [75, 50], "position_type": "percent"},
+    {"id": "R7", "type": "resistor", "value": "500Ω", "position": [70, 65], "position_type": "percent"},
+    {"id": "C11", "type": "capacitor", "value": "1000pF", "position": [80, 70], "position_type": "percent"},
+    {"id": "R8", "type": "resistor", "value": "4kΩ", "position": [65, 75], "position_type": "percent"},
+    {"id": "R9", "type": "resistor", "value": "820Ω", "position": [75, 75], "position_type": "percent"},
+    {"id": "C12", "type": "capacitor", "value": "2nF", "position": [65, 85], "position_type": "percent"},
+    {"id": "L6", "type": "inductor", "value": "100μH RFC", "position": [75, 85], "position_type": "percent"},
+    
+    {"id": "C13", "type": "capacitor", "value": "4-30pF", "position": [85, 40], "position_type": "percent"},
+    {"id": "L7", "type": "inductor", "value": "100nH", "position": [90, 55], "position_type": "percent"},
+    {"id": "C14", "type": "capacitor", "value": "1000pF", "position": [90, 65], "position_type": "percent"},
+    
+    {"id": "PWR", "type": "power_supply", "value": "-25V", "position": [90, 85], "position_type": "percent"}
   ],
-  "connections": [],
-  "power": {"voltage": 5, "source": "USB"},
+  "connections": [
+    {"from": "C1.positive", "to": "L1.pin1"},
+    {"from": "L1.pin2", "to": "Q1.base"},
+    {"from": "C2.positive", "to": "Q1.base"},
+    {"from": "C2.negative", "to": "GND"},
+    {"from": "Q1.emitter", "to": "R1.pin1"},
+    {"from": "R1.pin2", "to": "GND"},
+    {"from": "Q1.emitter", "to": "C3.positive"},
+    {"from": "C3.negative", "to": "GND"},
+    {"from": "R2.pin1", "to": "GND"},
+    {"from": "R2.pin2", "to": "R3.pin1"},
+    {"from": "R3.pin2", "to": "Q1.base"},
+    {"from": "C4.positive", "to": "R2.pin2"},
+    {"from": "C4.negative", "to": "GND"},
+    {"from": "Q1.collector", "to": "L2.pin1"},
+    {"from": "L2.pin2", "to": "PWR.negative"},
+    
+    {"from": "Q1.collector", "to": "C5.positive"},
+    {"from": "C5.negative", "to": "L3.pin1"},
+    {"from": "L3.pin2", "to": "C6.positive"},
+    {"from": "C6.negative", "to": "Q2.base"},
+    {"from": "Q2.emitter", "to": "R4.pin1"},
+    {"from": "R4.pin2", "to": "GND"},
+    {"from": "Q2.emitter", "to": "C7.positive"},
+    {"from": "C7.negative", "to": "GND"},
+    {"from": "R5.pin1", "to": "GND"},
+    {"from": "R5.pin2", "to": "R6.pin1"},
+    {"from": "R6.pin2", "to": "Q2.base"},
+    {"from": "C8.positive", "to": "R5.pin2"},
+    {"from": "C8.negative", "to": "GND"},
+    {"from": "Q2.collector", "to": "L4.pin1"},
+    {"from": "L4.pin2", "to": "PWR.negative"},
+    
+    {"from": "Q2.collector", "to": "C9.positive"},
+    {"from": "C9.negative", "to": "L5.pin1"},
+    {"from": "L5.pin2", "to": "C10.positive"},
+    {"from": "C10.negative", "to": "Q3.base"},
+    {"from": "Q3.emitter", "to": "R7.pin1"},
+    {"from": "R7.pin2", "to": "GND"},
+    {"from": "Q3.emitter", "to": "C11.positive"},
+    {"from": "C11.negative", "to": "GND"},
+    {"from": "R8.pin1", "to": "GND"},
+    {"from": "R8.pin2", "to": "R9.pin1"},
+    {"from": "R9.pin2", "to": "Q3.base"},
+    {"from": "C12.positive", "to": "R8.pin2"},
+    {"from": "C12.negative", "to": "GND"},
+    {"from": "Q3.collector", "to": "L6.pin1"},
+    {"from": "L6.pin2", "to": "PWR.negative"},
+    
+    {"from": "Q3.collector", "to": "C13.positive"},
+    {"from": "C13.negative", "to": "L7.pin1"},
+    {"from": "L7.pin2", "to": "C14.positive"},
+    {"from": "C14.negative", "to": "GND"},
+    {"from": "PWR.positive", "to": "GND"}
+  ],
+  "power": {"voltage": -25, "source": "PWR"},
   "canvas_mode": "agent",
-  "metadata": {
-    "name": "Arduino Nano v3.3",
-    "board_type": "nano",
-    "entry_point": "USB"
-  }
+  "metadata": {"name": "RF Amplifier Circuit", "entry_point": "C1"}
 }
 </circuit>
 
 PARSED REPLY:
-This is an Arduino Nano v3.3 schematic. I can see the board name "NanoV3.3" in the bottom right corner. The schematic shows the characteristic Arduino Nano layout with pins along both long edges, a mini-USB connector, the ATmega328P microcontroller, FT232RL USB-to-serial chip, voltage regulator, crystal oscillator, and various support components like LEDs, resistors, and capacitors.
+This is a three-stage RF amplifier circuit using 2N1141 transistors. The circuit has an input on the left, three identical amplifier stages in the middle, and an output on the right. Each stage includes bias resistors, coupling capacitors, inductors for tuning, and RFC (Radio Frequency Choke) inductors in the collector circuits. The circuit is powered by -25V and includes various capacitor values for coupling and bypassing.
 
 PARSED CIRCUIT:
 {
   "components": [
     {
-      "id": "U3",
-      "type": "ic",
-      "value": "ATmega328P",
+      "id": "C1",
+      "type": "capacitor",
+      "value": "68pF",
+      "position": [
+        12,
+        45
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "L1",
+      "type": "inductor",
+      "value": "10nH",
+      "position": [
+        18,
+        55
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "Q1",
+      "type": "transistor_npn",
+      "value": "2N1141",
+      "position": [
+        25,
+        50
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "C2",
+      "type": "capacitor",
+      "value": "4-30pF",
+      "position": [
+        22,
+        40
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "R1",
+      "type": "resistor",
+      "value": "500\u03a9",
+      "position": [
+        22,
+        65
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "C3",
+      "type": "capacitor",
+      "value": "1000pF",
+      "position": [
+        28,
+        70
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "R2",
+      "type": "resistor",
+      "value": "4k\u03a9",
+      "position": [
+        15,
+        75
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "R3",
+      "type": "resistor",
+      "value": "820\u03a9",
+      "position": [
+        25,
+        75
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "C4",
+      "type": "capacitor",
+      "value": "2nF",
+      "position": [
+        15,
+        85
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "L2",
+      "type": "inductor",
+      "value": "100\u03bcH RFC",
+      "position": [
+        25,
+        85
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "C5",
+      "type": "capacitor",
+      "value": "4-30pF",
+      "position": [
+        40,
+        40
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "L3",
+      "type": "inductor",
+      "value": "80nH",
+      "position": [
+        40,
+        55
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "C6",
+      "type": "capacitor",
+      "value": "1000pF",
+      "position": [
+        45,
+        50
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "Q2",
+      "type": "transistor_npn",
+      "value": "2N1141",
       "position": [
         50,
         50
@@ -52,49 +253,9 @@ PARSED CIRCUIT:
       "position_type": "percent"
     },
     {
-      "id": "U1",
-      "type": "ic",
-      "value": "FT232RL",
-      "position": [
-        70,
-        50
-      ],
-      "position_type": "percent"
-    },
-    {
-      "id": "U2",
-      "type": "ic",
-      "value": "AMS1117",
-      "position": [
-        25,
-        65
-      ],
-      "position_type": "percent"
-    },
-    {
-      "id": "USB1",
-      "type": "connector",
-      "value": "USB Mini",
-      "position": [
-        75,
-        30
-      ],
-      "position_type": "percent"
-    },
-    {
-      "id": "ICSP1",
-      "type": "connector",
-      "value": "ICSP",
-      "position": [
-        65,
-        75
-      ],
-      "position_type": "percent"
-    },
-    {
-      "id": "X1",
-      "type": "crystal",
-      "value": "16MHz",
+      "id": "R4",
+      "type": "resistor",
+      "value": "500\u03a9",
       "position": [
         45,
         65
@@ -102,125 +263,405 @@ PARSED CIRCUIT:
       "position_type": "percent"
     },
     {
-      "id": "LED1",
-      "type": "led",
-      "value": "Power LED",
-      "position": [
-        80,
-        45
-      ],
-      "position_type": "percent"
-    },
-    {
-      "id": "LED2",
-      "type": "led",
-      "value": "Pin 13 LED",
+      "id": "C7",
+      "type": "capacitor",
+      "value": "1000pF",
       "position": [
         55,
-        35
+        70
       ],
       "position_type": "percent"
     },
     {
-      "id": "SW1",
-      "type": "button",
-      "value": "Reset",
+      "id": "R5",
+      "type": "resistor",
+      "value": "4k\u03a9",
       "position": [
-        35,
-        45
+        40,
+        75
       ],
       "position_type": "percent"
     },
     {
-      "id": "J1",
-      "type": "connector",
-      "value": "Digital Pins",
+      "id": "R6",
+      "type": "resistor",
+      "value": "820\u03a9",
       "position": [
-        15,
+        50,
+        75
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "C8",
+      "type": "capacitor",
+      "value": "2nF",
+      "position": [
+        40,
+        85
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "L4",
+      "type": "inductor",
+      "value": "100\u03bcH RFC",
+      "position": [
+        50,
+        85
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "C9",
+      "type": "capacitor",
+      "value": "4-30pF",
+      "position": [
+        65,
         40
       ],
       "position_type": "percent"
     },
     {
-      "id": "J2",
-      "type": "connector",
-      "value": "Analog Pins",
+      "id": "L5",
+      "type": "inductor",
+      "value": "80nH",
+      "position": [
+        65,
+        55
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "C10",
+      "type": "capacitor",
+      "value": "1000pF",
+      "position": [
+        70,
+        50
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "Q3",
+      "type": "transistor_npn",
+      "value": "2N1141",
+      "position": [
+        75,
+        50
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "R7",
+      "type": "resistor",
+      "value": "500\u03a9",
+      "position": [
+        70,
+        65
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "C11",
+      "type": "capacitor",
+      "value": "1000pF",
+      "position": [
+        80,
+        70
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "R8",
+      "type": "resistor",
+      "value": "4k\u03a9",
+      "position": [
+        65,
+        75
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "R9",
+      "type": "resistor",
+      "value": "820\u03a9",
+      "position": [
+        75,
+        75
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "C12",
+      "type": "capacitor",
+      "value": "2nF",
+      "position": [
+        65,
+        85
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "L6",
+      "type": "inductor",
+      "value": "100\u03bcH RFC",
+      "position": [
+        75,
+        85
+      ],
+      "position_type": "percent"
+    },
+    {
+      "id": "C13",
+      "type": "capacitor",
+      "value": "4-30pF",
       "position": [
         85,
-        60
-      ],
-      "position_type": "percent"
-    },
-    {
-      "id": "R1",
-      "type": "resistor",
-      "value": "1k",
-      "position": [
-        52,
         40
       ],
       "position_type": "percent"
     },
     {
-      "id": "R2",
-      "type": "resistor",
-      "value": "1k",
+      "id": "L7",
+      "type": "inductor",
+      "value": "100nH",
       "position": [
-        77,
-        42
+        90,
+        55
       ],
       "position_type": "percent"
     },
     {
-      "id": "C1",
+      "id": "C14",
       "type": "capacitor",
-      "value": "100nF",
+      "value": "1000pF",
       "position": [
-        42,
-        70
+        90,
+        65
       ],
       "position_type": "percent"
     },
     {
-      "id": "C2",
-      "type": "capacitor",
-      "value": "100nF",
+      "id": "PWR",
+      "type": "power_supply",
+      "value": "-25V",
       "position": [
-        48,
-        70
-      ],
-      "position_type": "percent"
-    },
-    {
-      "id": "C3",
-      "type": "capacitor",
-      "value": "22pF",
-      "position": [
-        43,
-        62
-      ],
-      "position_type": "percent"
-    },
-    {
-      "id": "C4",
-      "type": "capacitor",
-      "value": "22pF",
-      "position": [
-        47,
-        62
+        90,
+        85
       ],
       "position_type": "percent"
     }
   ],
-  "connections": [],
+  "connections": [
+    {
+      "from": "C1.positive",
+      "to": "L1.pin1"
+    },
+    {
+      "from": "L1.pin2",
+      "to": "Q1.base"
+    },
+    {
+      "from": "C2.positive",
+      "to": "Q1.base"
+    },
+    {
+      "from": "C2.negative",
+      "to": "GND"
+    },
+    {
+      "from": "Q1.emitter",
+      "to": "R1.pin1"
+    },
+    {
+      "from": "R1.pin2",
+      "to": "GND"
+    },
+    {
+      "from": "Q1.emitter",
+      "to": "C3.positive"
+    },
+    {
+      "from": "C3.negative",
+      "to": "GND"
+    },
+    {
+      "from": "R2.pin1",
+      "to": "GND"
+    },
+    {
+      "from": "R2.pin2",
+      "to": "R3.pin1"
+    },
+    {
+      "from": "R3.pin2",
+      "to": "Q1.base"
+    },
+    {
+      "from": "C4.positive",
+      "to": "R2.pin2"
+    },
+    {
+      "from": "C4.negative",
+      "to": "GND"
+    },
+    {
+      "from": "Q1.collector",
+      "to": "L2.pin1"
+    },
+    {
+      "from": "L2.pin2",
+      "to": "PWR.negative"
+    },
+    {
+      "from": "Q1.collector",
+      "to": "C5.positive"
+    },
+    {
+      "from": "C5.negative",
+      "to": "L3.pin1"
+    },
+    {
+      "from": "L3.pin2",
+      "to": "C6.positive"
+    },
+    {
+      "from": "C6.negative",
+      "to": "Q2.base"
+    },
+    {
+      "from": "Q2.emitter",
+      "to": "R4.pin1"
+    },
+    {
+      "from": "R4.pin2",
+      "to": "GND"
+    },
+    {
+      "from": "Q2.emitter",
+      "to": "C7.positive"
+    },
+    {
+      "from": "C7.negative",
+      "to": "GND"
+    },
+    {
+      "from": "R5.pin1",
+      "to": "GND"
+    },
+    {
+      "from": "R5.pin2",
+      "to": "R6.pin1"
+    },
+    {
+      "from": "R6.pin2",
+      "to": "Q2.base"
+    },
+    {
+      "from": "C8.positive",
+      "to": "R5.pin2"
+    },
+    {
+      "from": "C8.negative",
+      "to": "GND"
+    },
+    {
+      "from": "Q2.collector",
+      "to": "L4.pin1"
+    },
+    {
+      "from": "L4.pin2",
+      "to": "PWR.negative"
+    },
+    {
+      "from": "Q2.collector",
+      "to": "C9.positive"
+    },
+    {
+      "from": "C9.negative",
+      "to": "L5.pin1"
+    },
+    {
+      "from": "L5.pin2",
+      "to": "C10.positive"
+    },
+    {
+      "from": "C10.negative",
+      "to": "Q3.base"
+    },
+    {
+      "from": "Q3.emitter",
+      "to": "R7.pin1"
+    },
+    {
+      "from": "R7.pin2",
+      "to": "GND"
+    },
+    {
+      "from": "Q3.emitter",
+      "to": "C11.positive"
+    },
+    {
+      "from": "C11.negative",
+      "to": "GND"
+    },
+    {
+      "from": "R8.pin1",
+      "to": "GND"
+    },
+    {
+      "from": "R8.pin2",
+      "to": "R9.pin1"
+    },
+    {
+      "from": "R9.pin2",
+      "to": "Q3.base"
+    },
+    {
+      "from": "C12.positive",
+      "to": "R8.pin2"
+    },
+    {
+      "from": "C12.negative",
+      "to": "GND"
+    },
+    {
+      "from": "Q3.collector",
+      "to": "L6.pin1"
+    },
+    {
+      "from": "L6.pin2",
+      "to": "PWR.negative"
+    },
+    {
+      "from": "Q3.collector",
+      "to": "C13.positive"
+    },
+    {
+      "from": "C13.negative",
+      "to": "L7.pin1"
+    },
+    {
+      "from": "L7.pin2",
+      "to": "C14.positive"
+    },
+    {
+      "from": "C14.negative",
+      "to": "GND"
+    },
+    {
+      "from": "PWR.positive",
+      "to": "GND"
+    }
+  ],
   "power": {
-    "voltage": 5,
-    "source": "USB"
+    "voltage": -25,
+    "source": "PWR"
   },
   "canvas_mode": "agent",
   "metadata": {
-    "name": "Arduino Nano v3.3",
-    "board_type": "nano",
-    "entry_point": "USB"
+    "name": "RF Amplifier Circuit",
+    "entry_point": "C1"
   }
 }

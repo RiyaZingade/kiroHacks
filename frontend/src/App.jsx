@@ -13,6 +13,8 @@ const EMPTY_CIRCUIT = {
   metadata: { name: "Untitled Circuit", entry_point: "B" }
 }
 
+const WELCOME = { role: 'assistant', content: "Hi! Describe a circuit and I'll build it, or ask me to modify the current one." }
+
 function getParams() {
   const p = new URLSearchParams(window.location.search)
   return {
@@ -31,6 +33,8 @@ export default function App() {
   }))
   const [chatExpanded, setChatExpanded] = useState(false)
   const [projectId, setProjectId] = useState(null)
+  const [messages, setMessages] = useState([WELCOME])
+  const [history, setHistory] = useState([])
 
   if (path === '/app') {
     return (
@@ -42,8 +46,23 @@ export default function App() {
           setChatExpanded={setChatExpanded}
           projectId={projectId}
           setProjectId={setProjectId}
+          messages={messages}
+          setMessages={setMessages}
+          history={history}
+          setHistory={setHistory}
         />
-        <ChatWidget circuit={circuit} setCircuit={setCircuit} expanded={chatExpanded} setExpanded={setChatExpanded} initialOpen={params.chatOpen} projectId={projectId} />
+        <ChatWidget
+          circuit={circuit}
+          setCircuit={setCircuit}
+          expanded={chatExpanded}
+          setExpanded={setChatExpanded}
+          initialOpen={params.chatOpen}
+          projectId={projectId}
+          messages={messages}
+          setMessages={setMessages}
+          history={history}
+          setHistory={setHistory}
+        />
       </>
     )
   }
